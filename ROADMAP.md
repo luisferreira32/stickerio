@@ -8,13 +8,15 @@ Here lies the _detailed_ roadmap of Stickerio. If you are interested in the proj
 - [x] Initial project skeletton;
 - [x] Initial table schema;
 - [x] Simple view endpoint of a single city;
-- [ ] Extend views for a full basic possibility (city view, movements view, upgrade buildings/training units view, map view);
-- [ ] Allow training of units;
-- [ ] Allow movement of units with basic output: if arriving at a player owned city they change garrisions, if arriving at a non-player owned city they attack, if arriving at an empty map location they forage a random (low) quantity of resources;
-- [ ] Allow upgrade of buildings: military buildings decrease training time, resource buildings increase resources per second;
-- [ ] Implement text-based CLI controls for getting the info
-- [ ] Implement text-based CLI controls for actions: training, movement, upgrading.
-- [ ] Balance configurations
+- [ ] Implement view API endpoints;
+- [ ] Migrate API configuration to a more standardized tool (e.g., proto / OAS);
+- [ ] Better separate business logic from API conversion;
+- [ ] Experiment with generics for the repetivive code with different types;
+- [ ] Implement event insertion API endpoints (movement, upgrades, training, etc.);
+- [ ] Implement event sourcing/handling;
+- [ ] Implement CLI to obtain the views;
+- [ ] Implement CLI to submit events;
+- [ ] Balance game configurations for a decent playing experience;
 
 ### Documentation
 - [x] Add a LICENSE

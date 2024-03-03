@@ -11,6 +11,14 @@ type UnitCount struct {
 	SwordsmenCount int
 }
 
+type ListCityInfoFilters struct {
+	LastCityID string
+	PageSize   int
+	PlayerID   string
+	// List cities in the area of (x1, y1, x2, y2)
+	LocationBounds []int
+}
+
 type CityInfo struct {
 	ID        string
 	Name      string
@@ -43,6 +51,12 @@ type ResourcesCount struct {
 	CirclesCount int
 }
 
+type ListMovementsFilters struct {
+	LastMovementID string
+	PageSize       int
+	OriginCityID   string
+}
+
 type Movement struct {
 	ID             string
 	PlayerID       string
@@ -54,6 +68,11 @@ type Movement struct {
 	*ResourcesCount
 }
 
+type ListUnitQueueItemFilters struct {
+	LastMovementID string
+	PageSize       int
+}
+
 type UnitQueueItem struct {
 	ID          string
 	CityID      string
@@ -61,6 +80,11 @@ type UnitQueueItem struct {
 	DurationSec int
 	UnitCount   int
 	UnitType    UnitName
+}
+
+type LisBuildingQueueItemFilters struct {
+	LastMovementID string
+	PageSize       int
 }
 
 type BuildingQueueItem struct {
