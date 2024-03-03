@@ -1,10 +1,8 @@
------
--- sources of truth
------
-
 create table if not exists event_source (
     id text primary key,
     epoch int,
+    player_id text,
+    city_id text,
     payload text
 );
 
@@ -13,10 +11,6 @@ create table if not exists players (
     nickname text,
     score int
 );
-
------
--- view tables
------
 
 create table if not exists cities_view (
     id text primary key,

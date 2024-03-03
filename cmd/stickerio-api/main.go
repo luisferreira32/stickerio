@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -39,32 +40,34 @@ func main() {
 		router.Get("/", handlers.GetWelcome)
 	})
 	router.Route("/api/cities", func(router chi.Router) {
-		router.Route("/{cityID}", func(router chi.Router) {
+		router.Route(fmt.Sprintf("/{%s}", internal.CityIDKey), func(router chi.Router) {
 			router.Use(internal.WithCityIDContext)
 			router.Get("/info", handlers.GetCityInfo)
 			router.Get("/", handlers.GetCity)
 
 			router.Route("/unitq", func(router chi.Router) {
-				router.Route("/{unitQueueItemID}", func(router chi.Router) {
-					// TODO: interceptor + handler
+				router.Route(fmt.Sprintf("/{%s}", internal.UnitQueueItemIDKey), func(router chi.Router) {
+					router.Use(internal.WithUnitQueueItemIDContext)
+					router.Get("/", handlers.GetUnitQueueItem)
 				})
 			})
 			router.Route("/buildingq", func(router chi.Router) {
-				router.Route("/{buildingQueueItemID}", func(router chi.Router) {
-					// TODO: interceptor + handler
+				router.Route(fmt.Sprintf("/{%s}", internal.BuildingQueueItemIDKey), func(router chi.Router) {
+					router.Use(internal.WithBuildingQueueItemIDContext)
+					router.Get("/", handlers.GetBuildingQueueItem)
 				})
 			})
 		})
 	})
 	router.Route("/api/movements", func(router chi.Router) {
-		router.Route("/{movementID}", func(router chi.Router) {
+		router.Route(fmt.Sprintf("/{%s}", internal.MovementIDKey), func(router chi.Router) {
 			router.Use(internal.WithMovementIDContext)
 			router.Get("/", handlers.GetMovement)
 		})
 	})
 
 	server := &http.Server{
-		Addr:              ":4000",
+		Addr:              ":8080",
 		ReadHeaderTimeout: 3 * time.Second,
 		Handler:           router,
 	}
@@ -77,6 +80,6 @@ func main() {
 			log.Printf("error starting server: %v", err)
 		}
 	}()
-	log.Print("started stickerio-api server")
+	log.Printf("started stickerio-api server from %s", os.Args[0])
 	<-ctx.Done()
 }
