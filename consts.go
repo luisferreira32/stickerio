@@ -1,22 +1,59 @@
 package stickerio
 
-var (
-	MineResourceCosts = map[int]*Resources{
-		1: {SticksCount: 1},
-		2: {SticksCount: 10},
-		3: {SticksCount: 100},
-		4: {SticksCount: 200},
-		5: {SticksCount: 1000},
-	}
-	MineResourceProductionPerSecond = map[int]*Resources{
-		1: {SticksCount: 1},
-		2: {SticksCount: 2},
-		3: {SticksCount: 4},
-		4: {SticksCount: 8},
-		5: {SticksCount: 16},
-	}
+import (
+	"encoding/json"
+	"os"
 )
 
+type BuildingName string
+type BuildingSpecs struct {
+	Multiplier []float64 `json:"multiplier"`
+}
+
 const (
-	SwordsmenSpeed = 1.0
+	Mine     BuildingName = "mines"
+	Barracks BuildingName = "barracks"
 )
+
+type UnitName string
+type UnitSpecs struct {
+	UnitSpeed              float64 `json:"speed"`
+	UnitProductionSpeedSec int     `json:"production_speed"`
+}
+
+const (
+	Stickmen  UnitName = "stickmen"
+	Swordsmen UnitName = "swordsmen"
+)
+
+type ResourceTrickle int
+type ResourceName string
+
+const (
+	Sticks  ResourceName = "sticks"
+	Circles ResourceName = "circles"
+)
+
+type GameConfig struct {
+	Buildings        map[BuildingName]BuildingSpecs
+	Units            map[UnitName]UnitSpecs
+	ResourceTrickles map[ResourceName]ResourceTrickle
+}
+
+var (
+	Config GameConfig
+)
+
+func init() {
+	rawConfig, err := os.ReadFile("config.json")
+	if err != nil {
+		panic(err)
+	}
+
+	Config = GameConfig{}
+
+	err = json.Unmarshal(rawConfig, &Config)
+	if err != nil {
+		panic(err)
+	}
+}

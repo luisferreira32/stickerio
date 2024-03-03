@@ -14,9 +14,10 @@ Here lies the _detailed_ roadmap of Stickerio. If you are interested in the proj
 - [ ] Allow upgrade of buildings: military buildings decrease training time, resource buildings increase resources per second;
 - [ ] Implement text-based CLI controls for getting the info
 - [ ] Implement text-based CLI controls for actions: training, movement, upgrading.
+- [ ] Balance configurations
 
 ### Documentation
-- [ ] Add a LICENSE
+- [x] Add a LICENSE
 - [ ] Extend README.md with relevant info about contribution, roadmap, purposes, etc.
 - [ ] Define guidelines for CONTRIBUTE.md
 - [ ] Formalize architecture decisions in ARCHITECTURE.md

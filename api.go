@@ -6,7 +6,7 @@ type StickerioPlayer struct {
 	Score    int
 }
 
-type Units struct {
+type UnitCount struct {
 	StickmenCount  int
 	SwordsmenCount int
 }
@@ -35,19 +35,39 @@ type City struct {
 	*CityInfo
 	*CityBuildings
 	*CityResources
-	*Units
+	*UnitCount
 }
 
-type Resources struct {
+type ResourcesCount struct {
 	SticksCount  int
 	CirclesCount int
 }
 
-type Movements struct {
-	ID            string
-	OriginID      string
-	DestinationID string
+type Movement struct {
+	ID             string
+	PlayerID       string
+	OriginID       string
+	DestinationID  string
+	DepartureEpoch int64
+	Speed          float64
+	*UnitCount
+	*ResourcesCount
+}
 
-	*Units
-	*Resources
+type UnitQueueItem struct {
+	ID          string
+	CityID      string
+	QueuedEpoch int64
+	DurationSec int
+	UnitCount   int
+	UnitType    UnitName
+}
+
+type BuildingQueueItem struct {
+	ID             string
+	CityID         string
+	QueuedEpoch    int64
+	DurationSec    int
+	TargetLevel    int
+	TargetBuilding BuildingName
 }

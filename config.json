@@ -1,0 +1,41 @@
+{
+    "description": "stickerio default config",
+    "units": {
+        "stickmen": {
+            "speed": 1.0,
+            "production_speed": 30
+        },
+        "swordsmen": {
+            "speed": 1.2,
+            "production_speed": 20
+        }
+    },
+    "buildings": {
+        "barracks": {
+            "multiplier": [
+                1.0,
+                0.9,
+                0.8,
+                0.75,
+                0.7,
+                0.68,
+                0.66
+            ]
+        },
+        "mines": {
+            "multiplier": [
+                1.0,
+                1.5,
+                2.0,
+                3.0,
+                4.0,
+                6.0,
+                10.0
+            ]
+        }
+    },
+    "resources": {
+        "sticks": 2,
+        "circles": 1
+    }
+}
