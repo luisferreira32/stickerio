@@ -10,14 +10,23 @@ import (
 type ContextKey string
 
 const (
-	PlayerIDKey ContextKey = "playerID"
-	CityIDKey   ContextKey = "cityID"
+	PlayerIDKey   ContextKey = "playerID"
+	CityIDKey     ContextKey = "cityID"
+	MovementIDKey ContextKey = "movementID"
 )
 
 func WithCityIDContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cityID := chi.URLParam(r, "cityID")
 		ctx := context.WithValue(r.Context(), CityIDKey, cityID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func WithMovementIDContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		movementID := chi.URLParam(r, "movementID")
+		ctx := context.WithValue(r.Context(), MovementIDKey, movementID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

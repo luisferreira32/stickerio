@@ -43,6 +43,23 @@ func main() {
 			router.Use(internal.WithCityIDContext)
 			router.Get("/info", handlers.GetCityInfo)
 			router.Get("/", handlers.GetCity)
+
+			router.Route("/unitq", func(router chi.Router) {
+				router.Route("/{unitQueueItemID}", func(router chi.Router) {
+					// TODO: interceptor + handler
+				})
+			})
+			router.Route("/buildingq", func(router chi.Router) {
+				router.Route("/{buildingQueueItemID}", func(router chi.Router) {
+					// TODO: interceptor + handler
+				})
+			})
+		})
+	})
+	router.Route("/api/movements", func(router chi.Router) {
+		router.Route("/{movementID}", func(router chi.Router) {
+			router.Use(internal.WithMovementIDContext)
+			router.Get("/", handlers.GetMovement)
 		})
 	})
 

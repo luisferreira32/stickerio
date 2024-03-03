@@ -83,7 +83,7 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 			SticksCountBase:  city.sticksCountBase,
 			SticksCountEpoch: city.sticksCountEpoch,
 		},
-		Units: &stickerio.Units{
+		UnitCount: &stickerio.UnitCount{
 			SwordsmenCount: city.swordsmenCount,
 		},
 	})
@@ -97,3 +97,45 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 		errHandle(err.Error())
 	}
 }
+
+func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
+	movementID, ok1 := r.Context().Value(MovementIDKey).(string)
+	playerID, ok2 := r.Context().Value(PlayerIDKey).(string)
+	if !ok1 || !ok2 {
+		errHandle("movementID/playerID not a string: %v, %v", r.Context().Value(MovementIDKey), r.Context().Value(PlayerIDKey))
+	}
+	movement, err := s.repository.GetMovement(r.Context(), movementID, playerID)
+	if err != nil {
+		errHandle(err.Error())
+	}
+
+	resp, err := json.Marshal(&stickerio.Movement{
+		ID:             movement.id,
+		PlayerID:       movement.playerID,
+		OriginID:       movement.originID,
+		DestinationID:  movement.destinationID,
+		DepartureEpoch: movement.departureEpoch,
+		Speed:          movement.speed,
+		UnitCount: &stickerio.UnitCount{
+			StickmenCount:  movement.stickmenCount,
+			SwordsmenCount: movement.swordmenCount,
+		},
+		ResourcesCount: &stickerio.ResourcesCount{
+			SticksCount:  movement.stickCount,
+			CirclesCount: movement.circlesCount,
+		},
+	})
+	if err != nil {
+		errHandle(err.Error())
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(resp)
+	if err != nil {
+		errHandle(err.Error())
+	}
+}
+
+func (s *ServerHandler) GetUnitQueueItem(w http.ResponseWriter, r *http.Request) {}
+
+func (s *ServerHandler) GetBuildingQueueItem(w http.ResponseWriter, r *http.Request) {}
