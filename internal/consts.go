@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/json"
 	"os"
+	"sort"
 )
 
 type buildingName string
@@ -17,7 +18,7 @@ const (
 
 type unitName string
 type unitSpecs struct {
-	UnitSpeed              float64 `json:"speed"`
+	UnitSpeed              float32 `json:"speed"`
 	UnitProductionSpeedSec int     `json:"production_speed"`
 }
 
@@ -41,7 +42,8 @@ type gameConfig struct {
 }
 
 var (
-	config gameConfig
+	config       gameConfig
+	slowestUnits []unitName
 )
 
 func init() {
@@ -56,4 +58,12 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	slowestUnits = make([]unitName, 0, len(config.Units))
+	for k := range config.Units {
+		slowestUnits = append(slowestUnits, k)
+	}
+	sort.Slice(slowestUnits, func(i, j int) bool {
+		return config.Units[slowestUnits[i]].UnitSpeed < config.Units[slowestUnits[j]].UnitSpeed
+	})
 }

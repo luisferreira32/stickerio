@@ -1,27 +1,50 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/google/uuid"
 	api "github.com/luisferreira32/stickerio/models"
 )
 
-func errHandle(fmtStr string, args ...any) {
+type stickerioRepository interface {
+	InsertEvent(ctx context.Context, e *event) error
+	GetCity(ctx context.Context, id, playerID string) (*city, error)
+	GetCityInfo(ctx context.Context, id string) (*city, error)
+	ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*city, error)
+	GetMovement(ctx context.Context, id, playerID string) (*movement, error)
+	ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*movement, error)
+	GetUnitQueueItem(ctx context.Context, id, cityID string) (*unitQueueItem, error)
+	ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*unitQueueItem, error)
+	GetBuildingQueueItem(ctx context.Context, id, cityID string) (*buildingQueueItem, error)
+	ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error)
+}
+
+type eventSourcer interface {
+	queueEventHandling(e *event)
+}
+
+func errHandle(w http.ResponseWriter, fmtStr string, args ...any) {
+	http.Error(w, fmt.Sprintf(fmtStr, args...), http.StatusInternalServerError)
 	// TODO better error handling instead of panic :)
 	panic(fmt.Sprintf(fmtStr, args...))
 }
 
-func NewServerHandler(repository StickerioRepository) *ServerHandler {
+func NewServerHandler(repository stickerioRepository, eventSourcer eventSourcer) *ServerHandler {
 	return &ServerHandler{
-		repository: repository,
+		repository:   repository,
+		eventSourcer: eventSourcer,
 	}
 }
 
 type ServerHandler struct {
-	repository StickerioRepository
+	repository   stickerioRepository
+	eventSourcer eventSourcer
 }
 
 func (s *ServerHandler) GetWelcome(w http.ResponseWriter, r *http.Request) {
@@ -30,14 +53,11 @@ func (s *ServerHandler) GetWelcome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
-	cityID, ok1 := r.Context().Value(CityIDKey).(string)
-	playerID, ok2 := r.Context().Value(PlayerIDKey).(string)
-	if !ok1 || !ok2 {
-		errHandle("cityID/playerID not a string: %v, %v", r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
-	}
+	cityID := r.Context().Value(CityIDKey).(string)
+	playerID := r.Context().Value(PlayerIDKey).(string)
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	resp := api.V1City{
@@ -66,24 +86,21 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) GetCityInfo(w http.ResponseWriter, r *http.Request) {
-	cityID, ok := r.Context().Value(CityIDKey).(string)
-	if !ok {
-		errHandle("cityID not a string: %v", r.Context().Value(CityIDKey))
-	}
+	cityID := r.Context().Value(CityIDKey).(string)
 	city, err := s.repository.GetCityInfo(r.Context(), cityID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	resp := api.V1CityInfo{
@@ -96,13 +113,13 @@ func (s *ServerHandler) GetCityInfo(w http.ResponseWriter, r *http.Request) {
 
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
@@ -119,12 +136,12 @@ func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
 	lastID := r.Context().Value(LastIDKey).(string)
 	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	cities, err := s.repository.ListCityInfo(r.Context(), lastID, pageSize, additionalFilters...)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	resp := make([]api.V1CityInfo, len(cities))
@@ -138,25 +155,22 @@ func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
 
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
-	movementID, ok1 := r.Context().Value(MovementIDKey).(string)
-	playerID, ok2 := r.Context().Value(PlayerIDKey).(string)
-	if !ok1 || !ok2 {
-		errHandle("movementID/playerID not a string: %v, %v", r.Context().Value(MovementIDKey), r.Context().Value(PlayerIDKey))
-	}
+	movementID := r.Context().Value(MovementIDKey).(string)
+	playerID := r.Context().Value(PlayerIDKey).(string)
 	movement, err := s.repository.GetMovement(r.Context(), movementID, playerID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	resp := &api.V1Movement{
@@ -178,25 +192,22 @@ func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
 
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
-	playerID, ok := r.Context().Value(PlayerIDKey).(string)
-	if !ok {
-		errHandle("playerID not a string: %v", r.Context().Value(PlayerIDKey))
-	}
+	playerID := r.Context().Value(PlayerIDKey).(string)
 	lastID := r.Context().Value(LastIDKey).(string)
 	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	additionalFilters := make([]listMovementsFilterOpt, 0)
@@ -207,7 +218,7 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 
 	movements, err := s.repository.ListMovements(r.Context(), playerID, lastID, pageSize, additionalFilters...)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	movementsList := make([]api.V1Movement, len(movements))
@@ -227,32 +238,29 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := json.Marshal(movementsList)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(resp)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) GetUnitQueueItem(w http.ResponseWriter, r *http.Request) {
-	unitQueueItemID, ok1 := r.Context().Value(UnitQueueItemIDKey).(string)
-	cityID, ok2 := r.Context().Value(CityIDKey).(string)
-	playerID, ok3 := r.Context().Value(PlayerIDKey).(string)
-	if !ok1 || !ok2 || !ok3 {
-		errHandle("unitQueueItemID/cityID/playerID not a string: %v, %v, %v", r.Context().Value(UnitQueueItemIDKey), r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
-	}
+	unitQueueItemID := r.Context().Value(UnitQueueItemIDKey).(string)
+	cityID := r.Context().Value(CityIDKey).(string)
+	playerID := r.Context().Value(PlayerIDKey).(string)
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	item, err := s.repository.GetUnitQueueItem(r.Context(), unitQueueItemID, city.id)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	resp := &api.V1UnitQueueItem{
@@ -265,37 +273,33 @@ func (s *ServerHandler) GetUnitQueueItem(w http.ResponseWriter, r *http.Request)
 
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request) {
-	cityID, ok1 := r.Context().Value(CityIDKey).(string)
-	playerID, ok2 := r.Context().Value(PlayerIDKey).(string)
-	if !ok1 || !ok2 {
-		errHandle("cityID/playerID not a string: %v, %v", r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
-	}
-
+	cityID := r.Context().Value(CityIDKey).(string)
+	playerID := r.Context().Value(PlayerIDKey).(string)
 	lastID := r.Context().Value(LastIDKey).(string)
 	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	items, err := s.repository.ListUnitQueueItems(r.Context(), city.id, lastID, pageSize)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	unitQueueItemsList := make([]api.V1UnitQueueItem, len(items))
@@ -310,32 +314,29 @@ func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request
 
 	respBytes, err := json.Marshal(unitQueueItemsList)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) GetBuildingQueueItem(w http.ResponseWriter, r *http.Request) {
-	buildingQueueItemID, ok1 := r.Context().Value(BuildingQueueItemIDKey).(string)
-	cityID, ok2 := r.Context().Value(CityIDKey).(string)
-	playerID, ok3 := r.Context().Value(PlayerIDKey).(string)
-	if !ok1 || !ok2 || !ok3 {
-		errHandle("unitQueueItemID/cityID/playerID not a string: %v, %v, %v", r.Context().Value(BuildingQueueItemIDKey), r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
-	}
+	buildingQueueItemID := r.Context().Value(BuildingQueueItemIDKey).(string)
+	cityID := r.Context().Value(CityIDKey).(string)
+	playerID := r.Context().Value(PlayerIDKey).(string)
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	item, err := s.repository.GetBuildingQueueItem(r.Context(), buildingQueueItemID, city.id)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	resp := &api.V1BuildingQueueItem{
@@ -348,37 +349,33 @@ func (s *ServerHandler) GetBuildingQueueItem(w http.ResponseWriter, r *http.Requ
 
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(respBytes)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 }
 
 func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Request) {
-	cityID, ok1 := r.Context().Value(CityIDKey).(string)
-	playerID, ok2 := r.Context().Value(PlayerIDKey).(string)
-	if !ok1 || !ok2 {
-		errHandle("cityID/playerID not a string: %v, %v", r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
-	}
-
+	cityID := r.Context().Value(CityIDKey).(string)
+	playerID := r.Context().Value(PlayerIDKey).(string)
 	lastID := r.Context().Value(LastIDKey).(string)
 	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	items, err := s.repository.ListBuildingQueueItems(r.Context(), city.id, lastID, pageSize)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	buildingQueueItemsList := make([]api.V1BuildingQueueItem, len(items))
@@ -393,12 +390,53 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 
 	resp, err := json.Marshal(buildingQueueItemsList)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(resp)
 	if err != nil {
-		errHandle(err.Error())
+		errHandle(w, err.Error())
 	}
+}
+
+func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
+	playerID := r.Context().Value(PlayerIDKey).(string)
+
+	decoder := json.NewDecoder(r.Body)
+	movement := api.V1Movement{}
+	err := decoder.Decode(&movement)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+
+	serversideEpoch := time.Now().Unix()
+
+	// important: these values cannot be trusted from the API
+	// set them on the server side based on token / internal clock
+	startMovement := &startMovementEvent{
+		MovementID:     tMovementID(movement.Id),
+		PlayerID:       tPlayerID(playerID),
+		OriginID:       tCityID(movement.OriginID),
+		DestinationID:  tCityID(movement.DestinationID),
+		DepartureEpoch: tEpoch(serversideEpoch),
+		StickmenCount:  tUnitCount(movement.UnitCount.StickmenCount),
+		SwordsmenCount: tUnitCount(movement.UnitCount.SwordsmenCount),
+		SticksCount:    tResourceCount(movement.ResourceCount.SticksCount),
+		CirclesCount:   tResourceCount(movement.ResourceCount.CirclesCount),
+	}
+
+	payload, err := json.Marshal(startMovement)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+
+	eventID := uuid.NewString()
+	s.repository.InsertEvent(r.Context(), &event{
+		id:      eventID,
+		epoch:   serversideEpoch,
+		payload: string(payload), // json marshalled bytes are valid UTF-8 strings
+	})
+
+	w.WriteHeader(http.StatusCreated)
 }

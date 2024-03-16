@@ -39,6 +39,9 @@ Here lies the _detailed_ roadmap of Stickerio. If you are interested in the proj
 ### User management
 - [ ] Allow federated sign-in (e.g., google, facebook, etc.)
 
+### Game implementation
+- [ ] Re-work efficiency of the event sourcing (serialization, etc.)
+
 ## Alpha version 2.0
 
 ### Gameplay

@@ -20,20 +20,66 @@ func NewStickerioRepository(dataSourceName string) *StickerioRepositoryImpl {
 	}
 }
 
-type StickerioRepository interface {
-	GetCity(ctx context.Context, id, playerID string) (*city, error)
-	GetCityInfo(ctx context.Context, id string) (*city, error)
-	ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*city, error)
-	GetMovement(ctx context.Context, id, playerID string) (*movement, error)
-	ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*movement, error)
-	GetUnitQueueItem(ctx context.Context, id, cityID string) (*unitQueueItem, error)
-	ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*unitQueueItem, error)
-	GetBuildingQueueItem(ctx context.Context, id, cityID string) (*buildingQueueItem, error)
-	ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error)
-}
-
 type StickerioRepositoryImpl struct {
 	db *sql.DB
+}
+
+type event struct {
+	id      string
+	name    string
+	epoch   int64
+	payload string // TODO: json encode might not be the most efficient way - improve this
+}
+
+func (r *StickerioRepositoryImpl) InsertEvent(ctx context.Context, e *event) error {
+	const insertEventQuery = `
+INSERT INTO event_source(id, event_name, epoch, payload) VALUES ($1, $2, $3, $4)
+ON CONFLICT(id) DO NOTHING
+`
+	_, err := r.db.ExecContext(ctx, insertEventQuery, e.id, e.name, e.epoch, e.payload)
+	if err != nil {
+		return fmt.Errorf("insertEventQuery failed: %w", err)
+	}
+	return nil
+}
+
+func (r *StickerioRepositoryImpl) ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error) {
+	const listEventsQuery = `
+SELECT
+id,
+event_name,
+epoch,
+payload
+FROM event_source
+WHERE epoch <= $1
+ORDER BY epoch, id
+`
+	rows, err := r.db.QueryContext(ctx, listEventsQuery, untilEpoch)
+	if err != nil {
+		return nil, fmt.Errorf("listEventsQuery failed: %w", err)
+	}
+
+	results := make([]*event, 0)
+
+	for rows.Next() {
+		result := &event{}
+		err := rows.Scan(
+			&result.id,
+			&result.name,
+			&result.epoch,
+			&result.payload,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("rows scan: %w", err)
+		}
+		results = append(results, result)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows err: %w", err)
+	}
+
+	return results, nil
 }
 
 type city struct {
@@ -353,6 +399,44 @@ LIMIT $3
 	}
 
 	return results, nil
+}
+
+func (r *StickerioRepositoryImpl) UpsertMovement(ctx context.Context, m *movement) error {
+	const upsertMovementQuery = `
+INSERT INTO movements_view(
+id,
+player_id,
+origin_id,
+destination_id,
+departure_epoch,
+speed,
+r_circles_count,
+r_stick_count,
+u_stickmen_count,
+u_swordmen_count)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT(id) REPLACE
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		upsertMovementQuery,
+		m.id,
+		m.playerID,
+		m.originID,
+		m.destinationID,
+		m.departureEpoch,
+		m.speed,
+		m.circlesCount,
+		m.stickCount,
+		m.stickmenCount,
+		m.swordmenCount,
+	)
+	if err != nil {
+		return fmt.Errorf("upsertMovementQuery failed: %w", err)
+	}
+
+	return nil
 }
 
 type unitQueueItem struct {
