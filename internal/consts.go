@@ -6,44 +6,38 @@ import (
 	"sort"
 )
 
-type buildingName string
+type (
+	tMovementID      string
+	tPlayerID        string
+	tCityID          string
+	tEpoch           int64
+	tUnitCount       map[string]int64
+	tResourceCount   map[string]int64
+	tItemID          string
+	tBuildingName    string
+	tUnitName        string
+	tResourceTrickle int64
+	tResourceName    string
+)
+
 type buildingSpecs struct {
 	Multiplier []float64 `json:"multiplier"`
 }
 
-const (
-	mine     buildingName = "mines"
-	barracks buildingName = "barracks"
-)
-
-type unitName string
 type unitSpecs struct {
 	UnitSpeed              float32 `json:"speed"`
 	UnitProductionSpeedSec int     `json:"production_speed"`
 }
 
-const (
-	stickmen  unitName = "stickmen"
-	swordsmen unitName = "swordsmen"
-)
-
-type resourceTrickle int
-type resourceName string
-
-const (
-	sticks  resourceName = "sticks"
-	circles resourceName = "circles"
-)
-
 type gameConfig struct {
-	Buildings        map[buildingName]buildingSpecs
-	Units            map[unitName]unitSpecs
-	ResourceTrickles map[resourceName]resourceTrickle
+	Buildings        map[tBuildingName]buildingSpecs
+	Units            map[tUnitName]unitSpecs
+	ResourceTrickles map[tResourceName]tResourceTrickle
 }
 
 var (
 	config       gameConfig
-	slowestUnits []unitName
+	slowestUnits []tUnitName
 )
 
 func init() {
@@ -59,7 +53,7 @@ func init() {
 		panic(err)
 	}
 
-	slowestUnits = make([]unitName, 0, len(config.Units))
+	slowestUnits = make([]tUnitName, 0, len(config.Units))
 	for k := range config.Units {
 		slowestUnits = append(slowestUnits, k)
 	}

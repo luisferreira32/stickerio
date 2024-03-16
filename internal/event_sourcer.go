@@ -24,16 +24,6 @@ var (
 	errPreConditionFailed = fmt.Errorf("pre-condition failed")
 )
 
-// NOTE: this types exist to make sure event sourcing compares are against valid types
-
-type tMovementID string
-type tPlayerID string
-type tCityID string
-type tEpoch int64
-type tUnitCount int32
-type tResourceCount int64
-type tItemID string
-
 // Inserted when a player starts a movement.
 // Its processing generates an arrivalMovementEvent at a later epcoh (calculated based on distance between cities / speed).
 type startMovementEvent struct {
@@ -42,10 +32,8 @@ type startMovementEvent struct {
 	OriginID       tCityID        `json:"originID"`
 	DestinationID  tCityID        `json:"destinationID"`
 	DepartureEpoch tEpoch         `json:"departureEpoch"`
-	StickmenCount  tUnitCount     `json:"stickmenCount"`
-	SwordsmenCount tUnitCount     `json:"swordsmenCount"`
-	SticksCount    tResourceCount `json:"sticksCount"`
-	CirclesCount   tResourceCount `json:"circlesCount"`
+	UnitCount      tUnitCount     `json:"unitCount"`
+	ResourceCount  tResourceCount `json:"resourceCount"`
 }
 
 // Inserted when a startMovementEvent is processed.
@@ -55,20 +43,18 @@ type startMovementEvent struct {
 // * forage if it's abandoned
 // Then, based on survival (if any), if the current city is not owned by the player (i.e., it was not a reinforce), re-calculate a startMovement event and schedule it.
 type arrivalMovementEvent struct {
-	MovementID     tMovementID    `json:"movementID"`
-	PlayerID       tPlayerID      `json:"playerID"`
-	OriginID       tCityID        `json:"originID"`
-	DestinationID  tCityID        `json:"destinationID"`
-	SwordsmenCount tUnitCount     `json:"swordsmenCount"`
-	StickmenCount  tUnitCount     `json:"stickmenCount"`
-	SticksCount    tResourceCount `json:"sticksCount"`
-	CirclesCount   tResourceCount `json:"circlesCount"`
+	MovementID    tMovementID    `json:"movementID"`
+	PlayerID      tPlayerID      `json:"playerID"`
+	OriginID      tCityID        `json:"originID"`
+	DestinationID tCityID        `json:"destinationID"`
+	UnitCount     tUnitCount     `json:"unitCount"`
+	ResourceCount tResourceCount `json:"resourceCount"`
 }
 
 type eventsRepository interface {
 	InsertEvent(ctx context.Context, e *event) error
 	ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error)
-	UpsertMovement(ctx context.Context, m *movement) error
+	UpsertMovement(ctx context.Context, m *dbMovement) error
 }
 
 // The EventSourcer is the magic of this game.
@@ -197,26 +183,18 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	if startMovement.OriginID == startMovement.DestinationID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot move to the same city")
 	}
-	originCity := s.cityList[startMovement.OriginID]
-	currentSticks := currentResources(originCity.sticksCountBase, originCity.sticksCountEpoch, sticks)
-	currentCircles := currentResources(originCity.circlesCountBase, originCity.circlesCountEpoch, circles)
-	if tUnitCount(originCity.stickmenCount) < startMovement.StickmenCount ||
-		tUnitCount(originCity.swordsmenCount) < startMovement.SwordsmenCount ||
-		currentSticks < startMovement.SticksCount ||
-		currentCircles < startMovement.CirclesCount {
+	if true { // TODO: check for unit and resource count vs. the s.cityList[startMovement.OriginID]
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "insuficient resources/units")
 	}
 
 	// insert new event
 	arrival := &arrivalMovementEvent{
-		MovementID:     startMovement.MovementID,
-		PlayerID:       startMovement.PlayerID,
-		OriginID:       startMovement.OriginID,
-		DestinationID:  startMovement.DestinationID,
-		StickmenCount:  startMovement.StickmenCount,
-		SwordsmenCount: startMovement.SwordsmenCount,
-		SticksCount:    startMovement.SticksCount,
-		CirclesCount:   startMovement.CirclesCount,
+		MovementID:    startMovement.MovementID,
+		PlayerID:      startMovement.PlayerID,
+		OriginID:      startMovement.OriginID,
+		DestinationID: startMovement.DestinationID,
+		UnitCount:     startMovement.UnitCount,
+		ResourceCount: startMovement.ResourceCount,
 	}
 	payload, err := json.Marshal(arrival)
 	if err != nil {
@@ -231,17 +209,23 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	s.queueEventHandling(chainEvent)
 
 	// upsert view table
-	m := &movement{
+	unitCount, err := json.Marshal(startMovement.UnitCount)
+	if err != nil {
+		return err
+	}
+	resourceCount, err := json.Marshal(startMovement.ResourceCount)
+	if err != nil {
+		return err
+	}
+	m := &dbMovement{
 		id:             string(startMovement.MovementID),
 		playerID:       string(startMovement.PlayerID),
 		originID:       string(startMovement.OriginID),
 		destinationID:  string(startMovement.DestinationID),
 		departureEpoch: int64(startMovement.DepartureEpoch),
-		circlesCount:   int32(startMovement.StickmenCount),
-		stickCount:     int32(startMovement.SwordsmenCount),
-		stickmenCount:  int32(startMovement.SticksCount),
-		swordmenCount:  int32(startMovement.CirclesCount),
-		speed:          getMovementSpeed(startMovement.StickmenCount, startMovement.SwordsmenCount),
+		unitCount:      string(unitCount),
+		resourceCount:  string(resourceCount),
+		speed:          getMovementSpeed(startMovement.UnitCount),
 	}
 	err = s.repository.UpsertMovement(ctx, m)
 	if err != nil {
@@ -251,21 +235,16 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	return nil
 }
 
-func getMovementSpeed(stickmenCount, swordsmenCount tUnitCount) float32 {
-	var movementSpeed float32
-	for _, slowUnit := range slowestUnits {
-		if slowUnit == stickmen && stickmenCount > 0 {
-			movementSpeed = config.Units[stickmen].UnitSpeed
-			break
-		}
-		if slowUnit == stickmen && swordsmenCount > 0 {
-			movementSpeed = config.Units[stickmen].UnitSpeed
-			break
-		}
+func hasEnoughResources(name tResourceName, cost int64, c *city) bool {
+	resourceBase := c.resourceBase[string(name)]
+	if resourceBase > cost {
+		return true
 	}
-	return movementSpeed
+	// TODO
+	return false
 }
 
-func currentResources(base, epoch int64, n resourceName) tResourceCount {
-	return tResourceCount(base + epoch*int64(config.ResourceTrickles[n]))
+func getMovementSpeed(unitCount tUnitCount) float32 {
+	// TODO calculate movement speed based on the config of the slowest unit
+	return 1.0
 }

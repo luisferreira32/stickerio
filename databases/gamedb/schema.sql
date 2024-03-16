@@ -2,7 +2,7 @@ create table if not exists event_source (
     id text primary key,
     event_name text,
     epoch int,
-    payload text
+    payload text -- json serialization of the events
 );
 
 create table if not exists players (
@@ -19,12 +19,9 @@ create table if not exists cities_view (
     location_y int,
     b_mine_level int,
     b_barracks_level int,
-    r_stick_count_base int,
-    r_stick_count_epoch int,
-    r_circles_count_base int,
-    r_circles_count_epoch int,
-    u_stickmen_count int,
-    u_swordmen_count int
+    r_base text, -- json serialization of resourceID: baseQuantity
+    r_epoch int,
+    u_count text -- json serialization of unitID: count
 );
 
 create table if not exists movements_view (
@@ -34,10 +31,8 @@ create table if not exists movements_view (
     destination_id text,
     departure_epoch int,
     speed real,
-    r_circles_count int,
-    r_stick_count int,
-    u_stickmen_count int,
-    u_swordmen_count int
+    r_count text, -- json serialization of resourceID: count
+    u_count text -- json serialization of unitID: count
 );
 
 create table if not exists unit_queue_view (

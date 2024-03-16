@@ -1,29 +1,13 @@
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/google/uuid"
 	api "github.com/luisferreira32/stickerio/models"
 )
-
-type stickerioRepository interface {
-	InsertEvent(ctx context.Context, e *event) error
-	GetCity(ctx context.Context, id, playerID string) (*city, error)
-	GetCityInfo(ctx context.Context, id string) (*city, error)
-	ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*city, error)
-	GetMovement(ctx context.Context, id, playerID string) (*movement, error)
-	ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*movement, error)
-	GetUnitQueueItem(ctx context.Context, id, cityID string) (*unitQueueItem, error)
-	ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*unitQueueItem, error)
-	GetBuildingQueueItem(ctx context.Context, id, cityID string) (*buildingQueueItem, error)
-	ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error)
-}
 
 type eventSourcer interface {
 	queueEventHandling(e *event)
@@ -35,16 +19,18 @@ func errHandle(w http.ResponseWriter, fmtStr string, args ...any) {
 	panic(fmt.Sprintf(fmtStr, args...))
 }
 
-func NewServerHandler(repository stickerioRepository, eventSourcer eventSourcer) *ServerHandler {
+func NewServerHandler(repository *StickerioRepository, eventSourcer eventSourcer) *ServerHandler {
 	return &ServerHandler{
-		repository:   repository,
 		eventSourcer: eventSourcer,
+		viewer:       viewerService{repository: repository},
+		inserter:     inserterService{repository: repository},
 	}
 }
 
 type ServerHandler struct {
-	repository   stickerioRepository
 	eventSourcer eventSourcer
+	viewer       viewerService
+	inserter     inserterService
 }
 
 func (s *ServerHandler) GetWelcome(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +41,7 @@ func (s *ServerHandler) GetWelcome(w http.ResponseWriter, r *http.Request) {
 func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 	cityID := r.Context().Value(CityIDKey).(string)
 	playerID := r.Context().Value(PlayerIDKey).(string)
-	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
+	city, err := s.viewer.GetCity(r.Context(), cityID, playerID)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -73,15 +59,10 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 			MinesLevel:    city.mineLevel,
 		},
 		CityResources: api.V1CityResources{
-			SticksCountBase:   city.sticksCountBase,
-			SticksCountEpoch:  city.sticksCountEpoch,
-			CirclesCountBase:  city.circlesCountBase,
-			CirclesCountEpoch: city.circlesCountEpoch,
+			Epoch:     city.resourceEpoch,
+			BaseCount: city.resourceBase,
 		},
-		UnitCount: api.V1UnitCount{
-			StickmenCount:  city.stickmenCount,
-			SwordsmenCount: city.swordsmenCount,
-		},
+		UnitCount: city.unitCount,
 	}
 
 	respBytes, err := resp.MarshalJSON()
@@ -98,7 +79,7 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 
 func (s *ServerHandler) GetCityInfo(w http.ResponseWriter, r *http.Request) {
 	cityID := r.Context().Value(CityIDKey).(string)
-	city, err := s.repository.GetCityInfo(r.Context(), cityID)
+	city, err := s.viewer.GetCityInfo(r.Context(), cityID)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -126,20 +107,13 @@ func (s *ServerHandler) GetCityInfo(w http.ResponseWriter, r *http.Request) {
 func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
 	playerIDFilter := r.URL.Query().Get(PlayerID.String())
 	locationBoundsFilter := r.URL.Query().Get(LocationBounds.String())
-	additionalFilters := make([]listCityInfoFilterOpt, 0)
-	if playerIDFilter != "" {
-		additionalFilters = append(additionalFilters, withPlayerID(playerIDFilter))
-	}
-	if locationBoundsFilter != "" {
-		// TODO: fix this
-	}
 	lastID := r.Context().Value(LastIDKey).(string)
 	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
 		errHandle(w, err.Error())
 	}
 
-	cities, err := s.repository.ListCityInfo(r.Context(), lastID, pageSize, additionalFilters...)
+	cities, err := s.viewer.ListCityInfo(r.Context(), lastID, pageSize, playerIDFilter, locationBoundsFilter)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -168,7 +142,7 @@ func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
 func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
 	movementID := r.Context().Value(MovementIDKey).(string)
 	playerID := r.Context().Value(PlayerIDKey).(string)
-	movement, err := s.repository.GetMovement(r.Context(), movementID, playerID)
+	movement, err := s.viewer.GetMovement(r.Context(), movementID, playerID)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -180,14 +154,8 @@ func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
 		DestinationID:  movement.destinationID,
 		DepartureEpoch: movement.departureEpoch,
 		Speed:          movement.speed,
-		UnitCount: api.V1UnitCount{
-			StickmenCount:  movement.stickmenCount,
-			SwordsmenCount: movement.swordmenCount,
-		},
-		ResourceCount: api.V1ResourceCount{
-			SticksCount:  movement.stickCount,
-			CirclesCount: movement.circlesCount,
-		},
+		UnitCount:      movement.unitCount,
+		ResourceCount:  movement.resourceCount,
 	}
 
 	respBytes, err := resp.MarshalJSON()
@@ -209,14 +177,9 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errHandle(w, err.Error())
 	}
-
-	additionalFilters := make([]listMovementsFilterOpt, 0)
 	originIDFilter := r.URL.Query().Get(OriginID.String())
-	if originIDFilter != "" {
-		additionalFilters = append(additionalFilters, withOriginCityID(originIDFilter))
-	}
 
-	movements, err := s.repository.ListMovements(r.Context(), playerID, lastID, pageSize, additionalFilters...)
+	movements, err := s.viewer.ListMovements(r.Context(), playerID, lastID, pageSize, originIDFilter)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -230,10 +193,8 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 		movementsList[i].DestinationID = movement.destinationID
 		movementsList[i].DepartureEpoch = movement.departureEpoch
 		movementsList[i].Speed = movement.speed
-		movementsList[i].UnitCount.StickmenCount = movement.stickmenCount
-		movementsList[i].UnitCount.SwordsmenCount = movement.swordmenCount
-		movementsList[i].ResourceCount.SticksCount = movement.stickCount
-		movementsList[i].ResourceCount.CirclesCount = movement.circlesCount
+		movementsList[i].UnitCount = movement.unitCount
+		movementsList[i].ResourceCount = movement.unitCount
 	}
 
 	resp, err := json.Marshal(movementsList)
@@ -253,12 +214,7 @@ func (s *ServerHandler) GetUnitQueueItem(w http.ResponseWriter, r *http.Request)
 	cityID := r.Context().Value(CityIDKey).(string)
 	playerID := r.Context().Value(PlayerIDKey).(string)
 
-	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
-	if err != nil {
-		errHandle(w, err.Error())
-	}
-
-	item, err := s.repository.GetUnitQueueItem(r.Context(), unitQueueItemID, city.id)
+	item, err := s.viewer.GetUnitQueueItem(r.Context(), unitQueueItemID, cityID, playerID)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -292,12 +248,7 @@ func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request
 		errHandle(w, err.Error())
 	}
 
-	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
-	if err != nil {
-		errHandle(w, err.Error())
-	}
-
-	items, err := s.repository.ListUnitQueueItems(r.Context(), city.id, lastID, pageSize)
+	items, err := s.viewer.ListUnitQueueItems(r.Context(), cityID, playerID, lastID, pageSize)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -329,12 +280,7 @@ func (s *ServerHandler) GetBuildingQueueItem(w http.ResponseWriter, r *http.Requ
 	cityID := r.Context().Value(CityIDKey).(string)
 	playerID := r.Context().Value(PlayerIDKey).(string)
 
-	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
-	if err != nil {
-		errHandle(w, err.Error())
-	}
-
-	item, err := s.repository.GetBuildingQueueItem(r.Context(), buildingQueueItemID, city.id)
+	item, err := s.viewer.GetBuildingQueueItem(r.Context(), buildingQueueItemID, cityID, playerID)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -368,12 +314,7 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 		errHandle(w, err.Error())
 	}
 
-	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
-	if err != nil {
-		errHandle(w, err.Error())
-	}
-
-	items, err := s.repository.ListBuildingQueueItems(r.Context(), city.id, lastID, pageSize)
+	items, err := s.viewer.ListBuildingQueueItems(r.Context(), cityID, playerID, lastID, pageSize)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -404,38 +345,19 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 	playerID := r.Context().Value(PlayerIDKey).(string)
 
 	decoder := json.NewDecoder(r.Body)
-	movement := api.V1Movement{}
-	err := decoder.Decode(&movement)
+	m := api.V1Movement{}
+	err := decoder.Decode(&m)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
 
-	serversideEpoch := time.Now().Unix()
-
-	// important: these values cannot be trusted from the API
-	// set them on the server side based on token / internal clock
-	startMovement := &startMovementEvent{
-		MovementID:     tMovementID(movement.Id),
-		PlayerID:       tPlayerID(playerID),
-		OriginID:       tCityID(movement.OriginID),
-		DestinationID:  tCityID(movement.DestinationID),
-		DepartureEpoch: tEpoch(serversideEpoch),
-		StickmenCount:  tUnitCount(movement.UnitCount.StickmenCount),
-		SwordsmenCount: tUnitCount(movement.UnitCount.SwordsmenCount),
-		SticksCount:    tResourceCount(movement.ResourceCount.SticksCount),
-		CirclesCount:   tResourceCount(movement.ResourceCount.CirclesCount),
-	}
-
-	payload, err := json.Marshal(startMovement)
-	if err != nil {
-		errHandle(w, err.Error())
-	}
-
-	eventID := uuid.NewString()
-	s.repository.InsertEvent(r.Context(), &event{
-		id:      eventID,
-		epoch:   serversideEpoch,
-		payload: string(payload), // json marshalled bytes are valid UTF-8 strings
+	err = s.inserter.StartMovement(r.Context(), &movement{
+		id:            m.Id,
+		playerID:      playerID,
+		originID:      m.OriginID,
+		destinationID: m.DestinationID,
+		resourceCount: m.ResourceCount,
+		unitCount:     m.UnitCount,
 	})
 
 	w.WriteHeader(http.StatusCreated)
