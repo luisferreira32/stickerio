@@ -36,10 +36,10 @@ func main() {
 	router.Use(internal.WithAuthentication)
 
 	// routes
-	router.Route("/api", func(router chi.Router) {
+	router.Route("/v1", func(router chi.Router) {
 		router.Get("/", handlers.GetWelcome)
 	})
-	router.Route("/api/cities", func(router chi.Router) {
+	router.Route("/v1/cities", func(router chi.Router) {
 		router.Get("/", handlers.ListCityInfo)
 
 		router.Route(fmt.Sprintf("/{%s}", internal.CityIDKey), func(router chi.Router) {
@@ -63,7 +63,7 @@ func main() {
 			})
 		})
 	})
-	router.Route("/api/movements", func(router chi.Router) {
+	router.Route("/v1/movements", func(router chi.Router) {
 		router.Get("/", handlers.ListMovements)
 
 		router.Route(fmt.Sprintf("/{%s}", internal.MovementIDKey), func(router chi.Router) {
