@@ -1,5 +1,6 @@
 create table if not exists event_source (
     id text primary key,
+    event_name text,
     epoch int,
     payload text
 );

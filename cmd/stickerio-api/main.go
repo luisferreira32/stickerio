@@ -23,7 +23,9 @@ func main() {
 	defer stop()
 
 	database := internal.NewStickerioRepository(os.Getenv("DB_HOST"))
-	handlers := internal.NewServerHandler(database)
+	eventSourcer := internal.NewEventSourcer(database)
+	eventSourcer.StartEventsWorker(ctx, 5*time.Minute)
+	handlers := internal.NewServerHandler(database, eventSourcer)
 
 	router := chi.NewRouter()
 

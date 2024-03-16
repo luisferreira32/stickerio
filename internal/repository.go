@@ -26,17 +26,60 @@ type StickerioRepositoryImpl struct {
 
 type event struct {
 	id      string
+	name    string
 	epoch   int64
 	payload string // TODO: json encode might not be the most efficient way - improve this
 }
 
 func (r *StickerioRepositoryImpl) InsertEvent(ctx context.Context, e *event) error {
 	const insertEventQuery = `
-INSERT INTO event_source(id, epoch, payload) VALUES ($1, $2, $3)
+INSERT INTO event_source(id, event_name, epoch, payload) VALUES ($1, $2, $3, $4)
 ON CONFLICT(id) DO NOTHING
 `
-	_, err := r.db.ExecContext(ctx, insertEventQuery, e.id, e.epoch, e.payload)
-	return err
+	_, err := r.db.ExecContext(ctx, insertEventQuery, e.id, e.name, e.epoch, e.payload)
+	if err != nil {
+		return fmt.Errorf("insertEventQuery failed: %w", err)
+	}
+	return nil
+}
+
+func (r *StickerioRepositoryImpl) ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error) {
+	const listEventsQuery = `
+SELECT
+id,
+event_name,
+epoch,
+payload
+FROM event_source
+WHERE epoch <= $1
+ORDER BY epoch, id
+`
+	rows, err := r.db.QueryContext(ctx, listEventsQuery, untilEpoch)
+	if err != nil {
+		return nil, fmt.Errorf("listEventsQuery failed: %w", err)
+	}
+
+	results := make([]*event, 0)
+
+	for rows.Next() {
+		result := &event{}
+		err := rows.Scan(
+			&result.id,
+			&result.name,
+			&result.epoch,
+			&result.payload,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("rows scan: %w", err)
+		}
+		results = append(results, result)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows err: %w", err)
+	}
+
+	return results, nil
 }
 
 type city struct {

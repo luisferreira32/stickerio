@@ -25,20 +25,26 @@ type stickerioRepository interface {
 	ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error)
 }
 
+type eventSourcer interface {
+	queueEventHandling(e *event)
+}
+
 func errHandle(w http.ResponseWriter, fmtStr string, args ...any) {
 	http.Error(w, fmt.Sprintf(fmtStr, args...), http.StatusInternalServerError)
 	// TODO better error handling instead of panic :)
 	panic(fmt.Sprintf(fmtStr, args...))
 }
 
-func NewServerHandler(repository stickerioRepository) *ServerHandler {
+func NewServerHandler(repository stickerioRepository, eventSourcer eventSourcer) *ServerHandler {
 	return &ServerHandler{
-		repository: repository,
+		repository:   repository,
+		eventSourcer: eventSourcer,
 	}
 }
 
 type ServerHandler struct {
-	repository stickerioRepository
+	repository   stickerioRepository
+	eventSourcer eventSourcer
 }
 
 func (s *ServerHandler) GetWelcome(w http.ResponseWriter, r *http.Request) {

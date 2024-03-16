@@ -86,7 +86,7 @@ func Test_GetWelcome(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			handler := NewServerHandler(&mockRepository{})
+			handler := NewServerHandler(&mockRepository{}, nil)
 			recorder := httptest.NewRecorder()
 			http.HandlerFunc(handler.GetWelcome).ServeHTTP(recorder, testcase.request)
 
