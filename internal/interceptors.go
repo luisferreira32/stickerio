@@ -45,8 +45,14 @@ const (
 
 func WithAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: validate token and add info to context
-		ctx := context.WithValue(r.Context(), PlayerIDKey, "foo")
+		playerID := "foo" // TODO: validate token and add info to context
+		if playerID == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("unauthorized"))
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), PlayerIDKey, playerID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -54,6 +60,12 @@ func WithAuthentication(next http.Handler) http.Handler {
 func WithCityIDContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cityID := chi.URLParam(r, CityID.String())
+		if cityID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("missing /cityid/ path parameter"))
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), CityIDKey, cityID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -87,6 +99,9 @@ func WithPagination(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lastID := r.URL.Query().Get(LastID.String())
 		pageSize := r.URL.Query().Get(PageSize.String())
+		if pageSize == "" {
+			pageSize = "10"
+		}
 
 		ctx := context.WithValue(r.Context(), LastIDKey, lastID)
 		ctx = context.WithValue(ctx, PageSizeKey, pageSize)

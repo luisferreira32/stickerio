@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	api "github.com/luisferreira32/stickerio/models"
 )
@@ -116,9 +117,9 @@ func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
 		// TODO: fix this
 	}
 	lastID := r.Context().Value(LastIDKey).(string)
-	pageSize := r.Context().Value(PageSize).(int)
-	if pageSize == 0 {
-		pageSize = 10
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
+	if err != nil {
+		errHandle(err.Error())
 	}
 
 	cities, err := s.repository.ListCityInfo(r.Context(), lastID, pageSize, additionalFilters...)
@@ -193,9 +194,9 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 		errHandle("playerID not a string: %v", r.Context().Value(PlayerIDKey))
 	}
 	lastID := r.Context().Value(LastIDKey).(string)
-	pageSize := r.Context().Value(PageSize).(int)
-	if pageSize == 0 {
-		pageSize = 10
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
+	if err != nil {
+		errHandle(err.Error())
 	}
 
 	additionalFilters := make([]listMovementsFilterOpt, 0)
@@ -282,9 +283,9 @@ func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request
 	}
 
 	lastID := r.Context().Value(LastIDKey).(string)
-	pageSize := r.Context().Value(PageSize).(int)
-	if pageSize == 0 {
-		pageSize = 10
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
+	if err != nil {
+		errHandle(err.Error())
 	}
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
@@ -365,9 +366,9 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 	}
 
 	lastID := r.Context().Value(LastIDKey).(string)
-	pageSize := r.Context().Value(PageSize).(int)
-	if pageSize == 0 {
-		pageSize = 10
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
+	if err != nil {
+		errHandle(err.Error())
 	}
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
