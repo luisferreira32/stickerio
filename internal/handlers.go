@@ -404,8 +404,8 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 	playerID := r.Context().Value(PlayerIDKey).(string)
 
 	decoder := json.NewDecoder(r.Body)
-	startMovement := api.V1Movement{}
-	err := decoder.Decode(&startMovement)
+	movement := api.V1Movement{}
+	err := decoder.Decode(&movement)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -414,10 +414,19 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 
 	// important: these values cannot be trusted from the API
 	// set them on the server side based on token / internal clock
-	startMovement.DepartureEpoch = serversideEpoch
-	startMovement.PlayerID = playerID
+	startMovement := &startMovementEvent{
+		MovementID:     tMovementID(movement.Id),
+		PlayerID:       tPlayerID(playerID),
+		OriginID:       tCityID(movement.OriginID),
+		DestinationID:  tCityID(movement.DestinationID),
+		DepartureEpoch: tEpoch(serversideEpoch),
+		StickmenCount:  tUnitCount(movement.UnitCount.StickmenCount),
+		SwordsmenCount: tUnitCount(movement.UnitCount.SwordsmenCount),
+		SticksCount:    tResourceCount(movement.ResourceCount.SticksCount),
+		CirclesCount:   tResourceCount(movement.ResourceCount.CirclesCount),
+	}
 
-	payload, err := startMovement.MarshalJSON()
+	payload, err := json.Marshal(startMovement)
 	if err != nil {
 		errHandle(w, err.Error())
 	}

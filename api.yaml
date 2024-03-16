@@ -289,8 +289,10 @@ components:
       properties:
         sticksCount:
           type: integer
+          format: int64
         circlesCount:
           type: integer
+          format: int64
     v1UnitQueueItem:
       type: object
       required: [id, queuedEpoch, durationSec, unitCount, unitType]

@@ -401,6 +401,44 @@ LIMIT $3
 	return results, nil
 }
 
+func (r *StickerioRepositoryImpl) UpsertMovement(ctx context.Context, m *movement) error {
+	const upsertMovementQuery = `
+INSERT INTO movements_view(
+id,
+player_id,
+origin_id,
+destination_id,
+departure_epoch,
+speed,
+r_circles_count,
+r_stick_count,
+u_stickmen_count,
+u_swordmen_count)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT(id) REPLACE
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		upsertMovementQuery,
+		m.id,
+		m.playerID,
+		m.originID,
+		m.destinationID,
+		m.departureEpoch,
+		m.speed,
+		m.circlesCount,
+		m.stickCount,
+		m.stickmenCount,
+		m.swordmenCount,
+	)
+	if err != nil {
+		return fmt.Errorf("upsertMovementQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type unitQueueItem struct {
 	id          string
 	cityID      string
