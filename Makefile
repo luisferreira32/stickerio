@@ -1,9 +1,18 @@
 # {{{
 
-bin/stickerio-api: internal/* cmd/stickerio-api/main.go
+.PHONY: _gen_oas_api
+_gen_oas_api: generated/
+
+generated/: api.yaml
+	rm -rf generated
+	rm -rf models
+	docker run --user $$(id -u):$$(id -g) --rm -v $$PWD:/local -w /local openapitools/openapi-generator-cli generate -i /local/api.yaml -g go -o /local/generated --additional-properties=packageName=generated
+	mkdir -p models/ && cp generated/*.go models/
+
+bin/stickerio-api: internal/* cmd/stickerio-api/main.go _gen_oas_api
 	CGO_ENABLED=0 go build -o bin/stickerio-api ./cmd/stickerio-api/main.go
 
-bin/stickerio: internal/* cmd/stickerio/main.go
+bin/stickerio: internal/* cmd/stickerio/main.go _gen_oas_api
 	CGO_ENABLED=0 go build -o bin/stickerio ./cmd/stickerio/main.go
 
 .PHONY: _clean_bin
@@ -11,7 +20,7 @@ _clean_bin:
 	rm -rf bin/*
 
 .PHONY: compile
-compile: bin/stickerio-api bin/stickerio
+compile: bin/stickerio-api
 
 # }}}
 

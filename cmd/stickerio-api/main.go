@@ -36,39 +36,38 @@ func main() {
 	router.Use(internal.WithAuthentication)
 
 	// routes
-	router.Route("/api", func(router chi.Router) {
+	router.Route(fmt.Sprintf("/%s", internal.APIVersion), func(router chi.Router) {
 		router.Get("/", handlers.GetWelcome)
-	})
-	router.Route("/api/cities", func(router chi.Router) {
-		router.Get("/", handlers.ListCityInfo)
-
-		router.Route(fmt.Sprintf("/{%s}", internal.CityIDKey), func(router chi.Router) {
-			router.Use(internal.WithCityIDContext)
-			router.Get("/info", handlers.GetCityInfo)
-			router.Get("/", handlers.GetCity)
-
-			router.Route("/unitq", func(router chi.Router) {
-				router.Get("/", handlers.ListUnitQueueItem)
-				router.Route(fmt.Sprintf("/{%s}", internal.UnitQueueItemIDKey), func(router chi.Router) {
-					router.Use(internal.WithUnitQueueItemIDContext)
-					router.Get("/", handlers.GetUnitQueueItem)
+		router.Use(internal.WithPagination)
+		router.Route("/cities", func(router chi.Router) {
+			router.Get("/", handlers.ListCityInfo)
+			router.Route(fmt.Sprintf("/{%s}", internal.CityID), func(router chi.Router) {
+				router.Use(internal.WithCityIDContext)
+				router.Get("/", handlers.GetCity)
+				router.Get("/info", handlers.GetCityInfo)
+				router.Route("/unitqitems", func(router chi.Router) {
+					router.Get("/", handlers.ListUnitQueueItem)
+					router.Route(fmt.Sprintf("/{%s}", internal.ItemID), func(router chi.Router) {
+						router.Use(internal.WithUnitQueueItemIDContext)
+						router.Get("/", handlers.GetUnitQueueItem)
+					})
 				})
-			})
-			router.Route("/buildingq", func(router chi.Router) {
-				router.Get("/", handlers.ListBuildingQueueItems)
-				router.Route(fmt.Sprintf("/{%s}", internal.BuildingQueueItemIDKey), func(router chi.Router) {
-					router.Use(internal.WithBuildingQueueItemIDContext)
-					router.Get("/", handlers.GetBuildingQueueItem)
+				router.Route("/buildingq", func(router chi.Router) {
+					router.Get("/", handlers.ListBuildingQueueItems)
+					router.Route(fmt.Sprintf("/{%s}", internal.ItemID), func(router chi.Router) {
+						router.Use(internal.WithBuildingQueueItemIDContext)
+						router.Get("/", handlers.GetBuildingQueueItem)
+					})
 				})
 			})
 		})
-	})
-	router.Route("/api/movements", func(router chi.Router) {
-		router.Get("/", handlers.ListMovements)
+		router.Route("/movements", func(router chi.Router) {
+			router.Get("/", handlers.ListMovements)
 
-		router.Route(fmt.Sprintf("/{%s}", internal.MovementIDKey), func(router chi.Router) {
-			router.Use(internal.WithMovementIDContext)
-			router.Get("/", handlers.GetMovement)
+			router.Route(fmt.Sprintf("/{%s}", internal.MovementID), func(router chi.Router) {
+				router.Use(internal.WithMovementIDContext)
+				router.Get("/", handlers.GetMovement)
+			})
 		})
 	})
 

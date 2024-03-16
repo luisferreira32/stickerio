@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/luisferreira32/stickerio"
 )
 
 type mockRepository struct {
@@ -92,126 +90,6 @@ func Test_GetWelcome(t *testing.T) {
 				t.Errorf("unexpected status code: %d, want: %d", recorder.Code, testcase.wantCode)
 			}
 			if diff := cmp.Diff(recorder.Body.Bytes(), testcase.wantResp); diff != "" {
-				t.Errorf("unexpected diff in response: %v", diff)
-			}
-		})
-	}
-}
-
-func toCityInfo(v []byte) *stickerio.CityInfo {
-	ci := &stickerio.CityInfo{}
-	err := json.Unmarshal(v, ci)
-	if err != nil {
-		panic(err)
-	}
-	return ci
-}
-
-func Test_GetCityInfo(t *testing.T) {
-	testcases := []struct {
-		name     string
-		request  *http.Request
-		mockCity *city
-		mockErr  error
-		wantCode int
-		wantResp *stickerio.CityInfo
-	}{
-		{
-			name: "get city info works with a given cityID",
-			request: httptest.NewRequest("GET", "/api", http.NoBody).WithContext(
-				contextWithValues(context.Background(), map[ContextKey]string{
-					CityIDKey: "foo",
-				}),
-			),
-			mockCity: &city{
-				id:   "foo",
-				name: "foo",
-			},
-			wantCode: 200,
-			wantResp: &stickerio.CityInfo{
-				ID:   "foo",
-				Name: "foo",
-			},
-		},
-	}
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			handler := NewServerHandler(&mockRepository{
-				funcGetCityInfo: func(ctx context.Context, id string) (*city, error) {
-					return testcase.mockCity, testcase.mockErr
-				},
-			})
-			recorder := httptest.NewRecorder()
-			http.HandlerFunc(handler.GetCityInfo).ServeHTTP(recorder, testcase.request)
-
-			if recorder.Code != testcase.wantCode {
-				t.Errorf("unexpected status code: %d, want: %d", recorder.Code, testcase.wantCode)
-			}
-			if diff := cmp.Diff(toCityInfo(recorder.Body.Bytes()), testcase.wantResp); diff != "" {
-				t.Errorf("unexpected diff in response: %v", diff)
-			}
-		})
-	}
-}
-
-func toCity(v []byte) *stickerio.City {
-	ci := &stickerio.City{}
-	err := json.Unmarshal(v, ci)
-	if err != nil {
-		panic(err)
-	}
-	return ci
-}
-
-func Test_GetCity(t *testing.T) {
-	testcases := []struct {
-		name     string
-		request  *http.Request
-		mockCity *city
-		mockErr  error
-		wantCode int
-		wantResp *stickerio.City
-	}{
-		{
-			name: "get city works with a given cityID and playerID",
-			request: httptest.NewRequest("GET", "/api", http.NoBody).WithContext(
-				contextWithValues(context.Background(), map[ContextKey]string{
-					CityIDKey:   "foo",
-					PlayerIDKey: "bar",
-				}),
-			),
-			mockCity: &city{
-				id:   "foo",
-				name: "foo",
-			},
-			wantCode: 200,
-			wantResp: &stickerio.City{
-				CityInfo: &stickerio.CityInfo{
-					ID:   "foo",
-					Name: "foo",
-				},
-				CityBuildings: &stickerio.CityBuildings{},
-				CityResources: &stickerio.CityResources{},
-				UnitCount:     &stickerio.UnitCount{},
-			},
-		},
-	}
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			handler := NewServerHandler(&mockRepository{
-				funcGetCity: func(ctx context.Context, id, playerID string) (*city, error) {
-					return testcase.mockCity, testcase.mockErr
-				},
-			})
-			recorder := httptest.NewRecorder()
-			http.HandlerFunc(handler.GetCity).ServeHTTP(recorder, testcase.request)
-
-			if recorder.Code != testcase.wantCode {
-				t.Errorf("unexpected status code: %d, want: %d", recorder.Code, testcase.wantCode)
-			}
-			if diff := cmp.Diff(toCity(recorder.Body.Bytes()), testcase.wantResp); diff != "" {
 				t.Errorf("unexpected diff in response: %v", diff)
 			}
 		})

@@ -40,16 +40,16 @@ type city struct {
 	id                string
 	name              string
 	playerID          string
-	locationX         int
-	locationY         int
-	mineLevel         int
-	barracksLevel     int
-	sticksCountBase   int
+	locationX         int32
+	locationY         int32
+	mineLevel         int32
+	barracksLevel     int32
+	sticksCountBase   int64
 	sticksCountEpoch  int64
-	circlesCountBase  int
+	circlesCountBase  int64
 	circlesCountEpoch int64
-	sickmenCount      int
-	swordsmenCount    int
+	stickmenCount     int32
+	swordsmenCount    int32
 }
 
 func (r *StickerioRepositoryImpl) GetCity(ctx context.Context, id, playerID string) (*city, error) {
@@ -92,7 +92,7 @@ WHERE id=$1 AND player_id=$2
 			&result.sticksCountEpoch,
 			&result.circlesCountBase,
 			&result.circlesCountEpoch,
-			&result.sickmenCount,
+			&result.stickmenCount,
 			&result.swordsmenCount,
 		)
 		if err != nil {
@@ -229,11 +229,11 @@ type movement struct {
 	originID       string
 	destinationID  string
 	departureEpoch int64
-	speed          float64
-	circlesCount   int
-	stickCount     int
-	stickmenCount  int
-	swordmenCount  int
+	speed          float32
+	circlesCount   int32
+	stickCount     int32
+	stickmenCount  int32
+	swordmenCount  int32
 }
 
 func (r *StickerioRepositoryImpl) GetMovement(ctx context.Context, id, playerID string) (*movement, error) {
@@ -359,8 +359,8 @@ type unitQueueItem struct {
 	id          string
 	cityID      string
 	queuedEpoch int64
-	durationSec int
-	unitCount   int
+	durationSec int32
+	unitCount   int32
 	unitType    string
 }
 
@@ -455,8 +455,8 @@ type buildingQueueItem struct {
 	id             string
 	cityID         string
 	queuedEpoch    int64
-	durationSec    int
-	targetLevel    int
+	durationSec    int32
+	targetLevel    int32
 	targetBuilding string
 }
 

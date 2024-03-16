@@ -1,0 +1,332 @@
+openapi: 3.0.3
+
+info:
+  title: Stickerio API
+  description: MMO RTS Stickerio game on an API.
+  version: 1.0.0
+
+
+paths:
+  /v1/cities:
+    get:
+      summary: List city infos with the given filters.
+      parameters:
+        - in: query
+          name: lastid
+          schema:
+            type: string
+        - in: query
+          name: pagesize
+          schema:
+            type: integer
+        - in: query
+          name: playerid
+          schema:
+            type: string
+        - in: query
+          name: locationbounds
+          schema:
+            type: array
+            items:
+              type: integer
+            description: Location bounds for the list query, e.g., x1,y1,x2,y2.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/v1CityInfo'
+  /v1/cities/{cityid}:
+    get:
+      summary: Get a city complete state.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1City'
+  /v1/cities/{cityid}/info:
+    get:
+      summary: Get a city info.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1CityInfo'
+  /v1/cities/{cityid}/unitqitems:
+    get:
+      summary: List unit queue items.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: lastid
+          schema:
+            type: string
+        - in: query
+          name: pagesize
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/v1UnitQueueItem'
+  /v1/cities/{cityid}/unitqitems/{itemid}:
+    get:
+      summary: Get a unit queue item.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: itemid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1UnitQueueItem'
+  /v1/cities/{cityid}/buildingqitems:
+    get:
+      summary: List building queue items.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: lastid
+          schema:
+            type: string
+        - in: query
+          name: pagesize
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/v1BuildingQueueItem'
+  /v1/cities/{cityid}/buildingqitems/{itemid}:
+    get:
+      summary: Get a building queue item.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: itemid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1BuildingQueueItem'
+  /v1/movements:
+    get:
+      summary: List the movements happening for the player.
+      parameters:
+        - in: query
+          name: lastid
+          schema:
+            type: string
+        - in: query
+          name: pagesize
+          schema:
+            type: integer
+        - in: query
+          name: originid
+          schema:
+            type: string
+        - in: query
+          name: destinationid
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/v1Movement'
+  /v1/movements/{movementid}:
+    get:
+      summary: Get a movement for the player.
+      parameters:
+        - in: path
+          name: movementid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1Movement'
+
+components:
+  schemas:
+    v1City:
+      type: object
+      required: [cityInfo, cityBuildings, cityResources, unitCount]
+      properties:
+        cityInfo:
+          $ref: '#/components/schemas/v1CityInfo'
+        cityBuildings:
+          $ref: '#/components/schemas/v1CityBuildings'
+        cityResources:
+          $ref: '#/components/schemas/v1CityResources'
+        unitCount:
+          $ref: '#/components/schemas/v1UnitCount'
+    v1CityInfo:
+      type: object
+      required: [id, name, playerID, locationX, locationY]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        playerID:
+          type: string
+        locationX:
+          type: integer
+        locationY:
+          type: integer
+    v1CityBuildings:
+      type: object
+      required: [barracksLevel, minesLevel]
+      properties:
+        barracksLevel:
+          type: integer
+        minesLevel:
+          type: integer
+    v1CityResources:
+      type: object
+      required: [sticksCountBase, sticksCountEpoch, circlesCountBase, circlesCountEpoch]
+      properties:
+        sticksCountBase:
+          type: integer
+          format: int64
+        sticksCountEpoch:
+          type: integer
+          format: int64
+        circlesCountBase:
+          type: integer
+          format: int64
+        circlesCountEpoch:
+          type: integer
+          format: int64
+    v1UnitCount:
+      type: object
+      required: [stickmenCount, swordsmenCount]
+      properties:
+        stickmenCount:
+          type: integer
+        swordsmenCount:
+          type: integer
+    v1ResourceCount:
+      type: object
+      required: [sticksCount, circlesCount]
+      properties:
+        sticksCount:
+          type: integer
+        circlesCount:
+          type: integer
+    v1UnitQueueItem:
+      type: object
+      required: [id, queuedEpoch, durationSec, unitCount, unitType]
+      properties:
+        id:
+          type: string
+        queuedEpoch:
+          type: integer
+          format: int64
+        durationSec:
+          type: integer
+        unitCount:
+          type: integer
+        unitType:
+          type: string
+    v1BuildingQueueItem:
+      type: object
+      required: [id, queuedEpoch, durationSec, level, building]
+      properties:
+        id:
+          type: string
+        queuedEpoch:
+          type: integer
+          format: int64
+        durationSec:
+          type: integer
+        level:
+          type: integer
+        building:
+          type: string
+    v1Movement:
+      type: object
+      required: [id, playerID, originID, destinationID, departureEpoch, speed, unitCount, resourceCount]
+      properties:
+        id:
+          type: string
+        playerID:
+          type: string
+        originID:
+          type: string
+        destinationID:
+          type: string
+        departureEpoch:
+          type: integer
+          format: int64
+        speed:
+          type: number
+        unitCount:
+          $ref: '#/components/schemas/v1UnitCount'
+        resourceCount:
+          $ref: '#/components/schemas/v1ResourceCount'

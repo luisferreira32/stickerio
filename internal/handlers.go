@@ -1,12 +1,12 @@
 package internal
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
-	"github.com/luisferreira32/stickerio"
+	api "github.com/luisferreira32/stickerio/models"
 )
 
 func errHandle(fmtStr string, args ...any) {
@@ -40,32 +40,37 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 		errHandle(err.Error())
 	}
 
-	resp, err := json.Marshal(&stickerio.City{
-		CityInfo: &stickerio.CityInfo{
-			ID:        city.id,
+	resp := api.V1City{
+		CityInfo: api.V1CityInfo{
+			Id:        city.id,
 			Name:      city.name,
 			PlayerID:  city.playerID,
 			LocationX: city.locationX,
 			LocationY: city.locationY,
 		},
-		CityBuildings: &stickerio.CityBuildings{
+		CityBuildings: api.V1CityBuildings{
 			BarracksLevel: city.barracksLevel,
-			MineLevel:     city.mineLevel,
+			MinesLevel:    city.mineLevel,
 		},
-		CityResources: &stickerio.CityResources{
-			SticksCountBase:  city.sticksCountBase,
-			SticksCountEpoch: city.sticksCountEpoch,
+		CityResources: api.V1CityResources{
+			SticksCountBase:   city.sticksCountBase,
+			SticksCountEpoch:  city.sticksCountEpoch,
+			CirclesCountBase:  city.circlesCountBase,
+			CirclesCountEpoch: city.circlesCountEpoch,
 		},
-		UnitCount: &stickerio.UnitCount{
+		UnitCount: api.V1UnitCount{
+			StickmenCount:  city.stickmenCount,
 			SwordsmenCount: city.swordsmenCount,
 		},
-	})
+	}
+
+	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
@@ -81,76 +86,63 @@ func (s *ServerHandler) GetCityInfo(w http.ResponseWriter, r *http.Request) {
 		errHandle(err.Error())
 	}
 
-	resp, err := json.Marshal(&stickerio.City{
-		CityInfo: &stickerio.CityInfo{
-			ID:        city.id,
-			Name:      city.name,
-			PlayerID:  city.playerID,
-			LocationX: city.locationX,
-			LocationY: city.locationY,
-		},
-	})
+	resp := api.V1CityInfo{
+		Id:        city.id,
+		Name:      city.name,
+		PlayerID:  city.playerID,
+		LocationX: city.locationX,
+		LocationY: city.locationY,
+	}
+
+	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
 }
 
 func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
-	b64EncodedFilters := r.URL.Query().Get("filters")
-	filtersReq := &stickerio.ListCityInfoFilters{
-		PageSize: 10, // defaults
-	}
+	playerIDFilter := r.URL.Query().Get(PlayerID.String())
+	locationBoundsFilter := r.URL.Query().Get(LocationBounds.String())
 	additionalFilters := make([]listCityInfoFilterOpt, 0)
-	if b64EncodedFilters != "" {
-		jsonEncodedFilters, err := base64.RawURLEncoding.DecodeString(b64EncodedFilters)
-		if err != nil {
-			errHandle(err.Error())
-		}
-		err = json.Unmarshal(jsonEncodedFilters, filtersReq)
-		if err != nil {
-			errHandle(err.Error())
-		}
+	if playerIDFilter != "" {
+		additionalFilters = append(additionalFilters, withPlayerID(playerIDFilter))
 	}
-	if filtersReq.PlayerID != "" {
-		additionalFilters = append(additionalFilters, withPlayerID(filtersReq.PlayerID))
+	if locationBoundsFilter != "" {
+		// TODO: fix this
 	}
-	if len(filtersReq.LocationBounds) == 4 && filtersReq.LocationBounds[0] <= filtersReq.LocationBounds[2] && filtersReq.LocationBounds[1] <= filtersReq.LocationBounds[3] {
-		additionalFilters = append(additionalFilters, withinLocation(
-			filtersReq.LocationBounds[0],
-			filtersReq.LocationBounds[1],
-			filtersReq.LocationBounds[2],
-			filtersReq.LocationBounds[3],
-		)...)
-	}
-	cities, err := s.repository.ListCityInfo(r.Context(), filtersReq.LastCityID, filtersReq.PageSize, additionalFilters...)
+	lastID := r.Context().Value(LastIDKey).(string)
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
 		errHandle(err.Error())
 	}
 
-	cityInfoList := make([]*stickerio.CityInfo, len(cities))
-	for i := 0; i < len(cities); i++ {
-		cityInfoList[i] = &stickerio.CityInfo{
-			ID:        cities[i].id,
-			Name:      cities[i].name,
-			PlayerID:  cities[i].playerID,
-			LocationX: cities[i].locationX,
-			LocationY: cities[i].locationY,
-		}
+	cities, err := s.repository.ListCityInfo(r.Context(), lastID, pageSize, additionalFilters...)
+	if err != nil {
+		errHandle(err.Error())
 	}
 
-	resp, err := json.Marshal(cityInfoList)
+	resp := make([]api.V1CityInfo, len(cities))
+	for i := 0; i < len(cities); i++ {
+		resp[i].Id = cities[i].id
+		resp[i].Name = cities[i].name
+		resp[i].PlayerID = cities[i].playerID
+		resp[i].LocationX = cities[i].locationX
+		resp[i].LocationY = cities[i].locationY
+	}
+
+	respBytes, err := json.Marshal(resp)
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
@@ -167,28 +159,30 @@ func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
 		errHandle(err.Error())
 	}
 
-	resp, err := json.Marshal(&stickerio.Movement{
-		ID:             movement.id,
+	resp := &api.V1Movement{
+		Id:             movement.id,
 		PlayerID:       movement.playerID,
 		OriginID:       movement.originID,
 		DestinationID:  movement.destinationID,
 		DepartureEpoch: movement.departureEpoch,
 		Speed:          movement.speed,
-		UnitCount: &stickerio.UnitCount{
+		UnitCount: api.V1UnitCount{
 			StickmenCount:  movement.stickmenCount,
 			SwordsmenCount: movement.swordmenCount,
 		},
-		ResourcesCount: &stickerio.ResourcesCount{
+		ResourceCount: api.V1ResourceCount{
 			SticksCount:  movement.stickCount,
 			CirclesCount: movement.circlesCount,
 		},
-	})
+	}
+
+	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
@@ -199,48 +193,36 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		errHandle("playerID not a string: %v", r.Context().Value(PlayerIDKey))
 	}
-	b64EncodedFilters := r.URL.Query().Get("filters")
-	filtersReq := &stickerio.ListMovementsFilters{
-		PageSize: 10, // defaults
-	}
-	additionalFilters := make([]listMovementsFilterOpt, 0)
-	if b64EncodedFilters != "" {
-		jsonEncodedFilters, err := base64.RawURLEncoding.DecodeString(b64EncodedFilters)
-		if err != nil {
-			errHandle(err.Error())
-		}
-		err = json.Unmarshal(jsonEncodedFilters, filtersReq)
-		if err != nil {
-			errHandle(err.Error())
-		}
-	}
-	if filtersReq.OriginCityID != "" {
-		additionalFilters = append(additionalFilters, withOriginCityID(filtersReq.OriginCityID))
-	}
-	movements, err := s.repository.ListMovements(r.Context(), playerID, filtersReq.LastMovementID, filtersReq.PageSize, additionalFilters...)
+	lastID := r.Context().Value(LastIDKey).(string)
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
 	if err != nil {
 		errHandle(err.Error())
 	}
 
-	movementsList := make([]*stickerio.Movement, len(movements))
+	additionalFilters := make([]listMovementsFilterOpt, 0)
+	originIDFilter := r.URL.Query().Get(OriginID.String())
+	if originIDFilter != "" {
+		additionalFilters = append(additionalFilters, withOriginCityID(originIDFilter))
+	}
+
+	movements, err := s.repository.ListMovements(r.Context(), playerID, lastID, pageSize, additionalFilters...)
+	if err != nil {
+		errHandle(err.Error())
+	}
+
+	movementsList := make([]api.V1Movement, len(movements))
 	for i := 0; i < len(movements); i++ {
 		movement := movements[i]
-		movementsList[i] = &stickerio.Movement{
-			ID:             movement.id,
-			PlayerID:       movement.playerID,
-			OriginID:       movement.originID,
-			DestinationID:  movement.destinationID,
-			DepartureEpoch: movement.departureEpoch,
-			Speed:          movement.speed,
-			UnitCount: &stickerio.UnitCount{
-				StickmenCount:  movement.stickmenCount,
-				SwordsmenCount: movement.swordmenCount,
-			},
-			ResourcesCount: &stickerio.ResourcesCount{
-				SticksCount:  movement.stickCount,
-				CirclesCount: movement.circlesCount,
-			},
-		}
+		movementsList[i].Id = movement.id
+		movementsList[i].PlayerID = movement.playerID
+		movementsList[i].OriginID = movement.originID
+		movementsList[i].DestinationID = movement.destinationID
+		movementsList[i].DepartureEpoch = movement.departureEpoch
+		movementsList[i].Speed = movement.speed
+		movementsList[i].UnitCount.StickmenCount = movement.stickmenCount
+		movementsList[i].UnitCount.SwordsmenCount = movement.swordmenCount
+		movementsList[i].ResourceCount.SticksCount = movement.stickCount
+		movementsList[i].ResourceCount.CirclesCount = movement.circlesCount
 	}
 
 	resp, err := json.Marshal(movementsList)
@@ -273,20 +255,21 @@ func (s *ServerHandler) GetUnitQueueItem(w http.ResponseWriter, r *http.Request)
 		errHandle(err.Error())
 	}
 
-	resp, err := json.Marshal(&stickerio.UnitQueueItem{
-		ID:          item.id,
-		CityID:      item.cityID,
+	resp := &api.V1UnitQueueItem{
+		Id:          item.id,
 		QueuedEpoch: item.queuedEpoch,
 		DurationSec: item.durationSec,
 		UnitCount:   item.unitCount,
-		UnitType:    stickerio.UnitName(item.unitType),
-	})
+		UnitType:    item.unitType,
+	}
+
+	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
@@ -299,19 +282,10 @@ func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request
 		errHandle("cityID/playerID not a string: %v, %v", r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
 	}
 
-	b64EncodedFilters := r.URL.Query().Get("filters")
-	filtersReq := &stickerio.ListUnitQueueItemFilters{
-		PageSize: 10, // defaults
-	}
-	if b64EncodedFilters != "" {
-		jsonEncodedFilters, err := base64.RawURLEncoding.DecodeString(b64EncodedFilters)
-		if err != nil {
-			errHandle(err.Error())
-		}
-		err = json.Unmarshal(jsonEncodedFilters, filtersReq)
-		if err != nil {
-			errHandle(err.Error())
-		}
+	lastID := r.Context().Value(LastIDKey).(string)
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
+	if err != nil {
+		errHandle(err.Error())
 	}
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
@@ -319,31 +293,28 @@ func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request
 		errHandle(err.Error())
 	}
 
-	items, err := s.repository.ListUnitQueueItems(r.Context(), city.id, filtersReq.LastMovementID, filtersReq.PageSize)
+	items, err := s.repository.ListUnitQueueItems(r.Context(), city.id, lastID, pageSize)
 	if err != nil {
 		errHandle(err.Error())
 	}
 
-	unitQueueItemsList := make([]*stickerio.UnitQueueItem, len(items))
+	unitQueueItemsList := make([]api.V1UnitQueueItem, len(items))
 	for i := 0; i < len(items); i++ {
 		item := items[i]
-		unitQueueItemsList[i] = &stickerio.UnitQueueItem{
-			ID:          item.id,
-			CityID:      item.cityID,
-			QueuedEpoch: item.queuedEpoch,
-			DurationSec: item.durationSec,
-			UnitCount:   item.unitCount,
-			UnitType:    stickerio.UnitName(item.unitType),
-		}
+		unitQueueItemsList[i].Id = item.id
+		unitQueueItemsList[i].QueuedEpoch = item.queuedEpoch
+		unitQueueItemsList[i].DurationSec = item.durationSec
+		unitQueueItemsList[i].UnitCount = item.unitCount
+		unitQueueItemsList[i].UnitType = item.unitType
 	}
 
-	resp, err := json.Marshal(unitQueueItemsList)
+	respBytes, err := json.Marshal(unitQueueItemsList)
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
@@ -367,20 +338,21 @@ func (s *ServerHandler) GetBuildingQueueItem(w http.ResponseWriter, r *http.Requ
 		errHandle(err.Error())
 	}
 
-	resp, err := json.Marshal(&stickerio.BuildingQueueItem{
-		ID:             item.id,
-		CityID:         item.cityID,
-		QueuedEpoch:    item.queuedEpoch,
-		DurationSec:    item.durationSec,
-		TargetLevel:    item.targetLevel,
-		TargetBuilding: stickerio.BuildingName(item.targetBuilding),
-	})
+	resp := &api.V1BuildingQueueItem{
+		Id:          item.id,
+		QueuedEpoch: item.queuedEpoch,
+		DurationSec: item.durationSec,
+		Level:       item.targetLevel,
+		Building:    item.targetBuilding,
+	}
+
+	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(resp)
+	_, err = w.Write(respBytes)
 	if err != nil {
 		errHandle(err.Error())
 	}
@@ -393,19 +365,10 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 		errHandle("cityID/playerID not a string: %v, %v", r.Context().Value(CityIDKey), r.Context().Value(PlayerIDKey))
 	}
 
-	b64EncodedFilters := r.URL.Query().Get("filters")
-	filtersReq := &stickerio.LisBuildingQueueItemFilters{
-		PageSize: 10, // defaults
-	}
-	if b64EncodedFilters != "" {
-		jsonEncodedFilters, err := base64.RawURLEncoding.DecodeString(b64EncodedFilters)
-		if err != nil {
-			errHandle(err.Error())
-		}
-		err = json.Unmarshal(jsonEncodedFilters, filtersReq)
-		if err != nil {
-			errHandle(err.Error())
-		}
+	lastID := r.Context().Value(LastIDKey).(string)
+	pageSize, err := strconv.Atoi(r.Context().Value(PageSize).(string))
+	if err != nil {
+		errHandle(err.Error())
 	}
 
 	city, err := s.repository.GetCity(r.Context(), cityID, playerID)
@@ -413,22 +376,19 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 		errHandle(err.Error())
 	}
 
-	items, err := s.repository.ListBuildingQueueItems(r.Context(), city.id, filtersReq.LastMovementID, filtersReq.PageSize)
+	items, err := s.repository.ListBuildingQueueItems(r.Context(), city.id, lastID, pageSize)
 	if err != nil {
 		errHandle(err.Error())
 	}
 
-	buildingQueueItemsList := make([]*stickerio.BuildingQueueItem, len(items))
+	buildingQueueItemsList := make([]api.V1BuildingQueueItem, len(items))
 	for i := 0; i < len(items); i++ {
 		item := items[i]
-		buildingQueueItemsList[i] = &stickerio.BuildingQueueItem{
-			ID:             item.id,
-			CityID:         item.cityID,
-			QueuedEpoch:    item.queuedEpoch,
-			DurationSec:    item.durationSec,
-			TargetLevel:    item.targetLevel,
-			TargetBuilding: stickerio.BuildingName(item.targetBuilding),
-		}
+		buildingQueueItemsList[i].Id = item.id
+		buildingQueueItemsList[i].QueuedEpoch = item.queuedEpoch
+		buildingQueueItemsList[i].DurationSec = item.durationSec
+		buildingQueueItemsList[i].Level = item.targetLevel
+		buildingQueueItemsList[i].Building = item.targetBuilding
 	}
 
 	resp, err := json.Marshal(buildingQueueItemsList)
