@@ -1,12 +1,13 @@
 # {{{
 
 .PHONY: _gen_oas_api
-_gen_oas_api: _generated/
+_gen_oas_api: generated/
 
-_generated/: api.yaml
-	rm -rf _generated
-	docker run --user $$(id -u):$$(id -g) --rm -v $$PWD:/local -w /local openapitools/openapi-generator-cli generate -i /local/api.yaml -g go -o /local/_generated
-	@echo "Golang models generated to _generated/"
+generated/: api.yaml
+	rm -rf generated
+	rm -rf models
+	docker run --user $$(id -u):$$(id -g) --rm -v $$PWD:/local -w /local openapitools/openapi-generator-cli generate -i /local/api.yaml -g go -o /local/generated --additional-properties=packageName=generated
+	mkdir -p models/ && cp generated/*.go models/
 
 bin/stickerio-api: internal/* cmd/stickerio-api/main.go _gen_oas_api
 	CGO_ENABLED=0 go build -o bin/stickerio-api ./cmd/stickerio-api/main.go

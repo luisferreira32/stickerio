@@ -12,24 +12,24 @@ paths:
       summary: List city infos with the given filters.
       parameters:
         - in: query
-          name: lastCityID
+          name: lastid
           schema:
             type: string
         - in: query
-          name: pageSize
+          name: pagesize
           schema:
             type: integer
         - in: query
-          name: playerID
+          name: playerid
           schema:
             type: string
         - in: query
-          name: locationBounds
+          name: locationbounds
           schema:
             type: array
             items:
               type: integer
-            description: Location bounds for the list query [x1, y1, x2, y2].
+            description: Location bounds for the list query, e.g., x1,y1,x2,y2.
       responses:
         '200':
           description: OK
@@ -81,11 +81,11 @@ paths:
           schema:
             type: string
         - in: query
-          name: lastItemID
+          name: lastid
           schema:
             type: string
         - in: query
-          name: pageSize
+          name: pagesize
           schema:
             type: integer
       responses:
@@ -128,11 +128,11 @@ paths:
           schema:
             type: string
         - in: query
-          name: lastItemID
+          name: lastid
           schema:
             type: string
         - in: query
-          name: pageSize
+          name: pagesize
           schema:
             type: integer
       responses:
@@ -170,13 +170,21 @@ paths:
       summary: List the movements happening for the player.
       parameters:
         - in: query
-          name: lastMovementID
+          name: lastid
           schema:
             type: string
         - in: query
-          name: pageSize
+          name: pagesize
           schema:
             type: integer
+        - in: query
+          name: originid
+          schema:
+            type: string
+        - in: query
+          name: destinationid
+          schema:
+            type: string
       responses:
         '200':
           description: OK
@@ -207,6 +215,7 @@ components:
   schemas:
     v1City:
       type: object
+      required: [cityInfo, cityBuildings, cityResources, unitCount]
       properties:
         cityInfo:
           $ref: '#/components/schemas/v1CityInfo'
@@ -218,6 +227,7 @@ components:
           $ref: '#/components/schemas/v1UnitCount'
     v1CityInfo:
       type: object
+      required: [id, name, playerID, locationX, locationY]
       properties:
         id:
           type: string
@@ -231,6 +241,7 @@ components:
           type: integer
     v1CityBuildings:
       type: object
+      required: [barracksLevel, minesLevel]
       properties:
         barracksLevel:
           type: integer
@@ -238,6 +249,7 @@ components:
           type: integer
     v1CityResources:
       type: object
+      required: [sticksCountBase, sticksCountEpoch, circlesCountBase, circlesCountEpoch]
       properties:
         sticksCountBase:
           type: integer
@@ -253,6 +265,7 @@ components:
           format: int64
     v1UnitCount:
       type: object
+      required: [stickmenCount, swordsmenCount]
       properties:
         stickmenCount:
           type: integer
@@ -260,6 +273,7 @@ components:
           type: integer
     v1ResourceCount:
       type: object
+      required: [sticksCount, circlesCount]
       properties:
         sticksCount:
           type: integer
@@ -267,6 +281,7 @@ components:
           type: integer
     v1UnitQueueItem:
       type: object
+      required: [id, queuedEpoch, durationSec, unitCount, unitType]
       properties:
         id:
           type: string
@@ -281,6 +296,7 @@ components:
           type: string
     v1BuildingQueueItem:
       type: object
+      required: [id, queuedEpoch, durationSec, level, building]
       properties:
         id:
           type: string
@@ -295,6 +311,7 @@ components:
           type: string
     v1Movement:
       type: object
+      required: [id, playerID, originID, destinationID, departureEpoch, speed, unitCount, resourceCount]
       properties:
         id:
           type: string
