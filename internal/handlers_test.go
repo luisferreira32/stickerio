@@ -11,6 +11,7 @@ import (
 )
 
 type mockRepository struct {
+	funcInsertEvent            func(ctx context.Context, e *event) error
 	funcGetCity                func(ctx context.Context, id, playerID string) (*city, error)
 	funcGetCityInfo            func(ctx context.Context, id string) (*city, error)
 	funcGetMovement            func(ctx context.Context, id, playerID string) (*movement, error)
@@ -22,6 +23,9 @@ type mockRepository struct {
 	funcListBuildingQueueItems func(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error)
 }
 
+func (m *mockRepository) InsertEvent(ctx context.Context, e *event) error {
+	return m.funcInsertEvent(ctx, e)
+}
 func (m *mockRepository) GetCity(ctx context.Context, id, playerID string) (*city, error) {
 	return m.funcGetCity(ctx, id, playerID)
 }

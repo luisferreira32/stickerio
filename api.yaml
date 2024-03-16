@@ -210,6 +210,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1Movement'
+  /v1/movements/start:
+    post:
+      summary: Start a movement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/v1Movement'
+      responses:
+        '201':
+          description: Created
 
 components:
   schemas:

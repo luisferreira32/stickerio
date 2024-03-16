@@ -63,6 +63,7 @@ func main() {
 		})
 		router.Route("/movements", func(router chi.Router) {
 			router.Get("/", handlers.ListMovements)
+			router.Post("/start", handlers.StartMovement)
 
 			router.Route(fmt.Sprintf("/{%s}", internal.MovementID), func(router chi.Router) {
 				router.Use(internal.WithMovementIDContext)

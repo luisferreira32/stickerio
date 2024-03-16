@@ -20,20 +20,23 @@ func NewStickerioRepository(dataSourceName string) *StickerioRepositoryImpl {
 	}
 }
 
-type StickerioRepository interface {
-	GetCity(ctx context.Context, id, playerID string) (*city, error)
-	GetCityInfo(ctx context.Context, id string) (*city, error)
-	ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*city, error)
-	GetMovement(ctx context.Context, id, playerID string) (*movement, error)
-	ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*movement, error)
-	GetUnitQueueItem(ctx context.Context, id, cityID string) (*unitQueueItem, error)
-	ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*unitQueueItem, error)
-	GetBuildingQueueItem(ctx context.Context, id, cityID string) (*buildingQueueItem, error)
-	ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error)
-}
-
 type StickerioRepositoryImpl struct {
 	db *sql.DB
+}
+
+type event struct {
+	id      string
+	epoch   int64
+	payload string // TODO: json encode might not be the most efficient way - improve this
+}
+
+func (r *StickerioRepositoryImpl) InsertEvent(ctx context.Context, e *event) error {
+	const insertEventQuery = `
+INSERT INTO event_source(id, epoch, payload) VALUES ($1, $2, $3)
+ON CONFLICT(id) DO NOTHING
+`
+	_, err := r.db.ExecContext(ctx, insertEventQuery, e.id, e.epoch, e.payload)
+	return err
 }
 
 type city struct {

@@ -74,6 +74,12 @@ func WithCityIDContext(next http.Handler) http.Handler {
 func WithMovementIDContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		movementID := chi.URLParam(r, MovementID.String())
+		if movementID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("missing /movementid/ path parameter"))
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), MovementIDKey, movementID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -82,6 +88,12 @@ func WithMovementIDContext(next http.Handler) http.Handler {
 func WithUnitQueueItemIDContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		unitQueueItemID := chi.URLParam(r, ItemID.String())
+		if unitQueueItemID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("missing /itemid/ path parameter"))
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), UnitQueueItemIDKey, unitQueueItemID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -90,6 +102,12 @@ func WithUnitQueueItemIDContext(next http.Handler) http.Handler {
 func WithBuildingQueueItemIDContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buildingQueueItemID := chi.URLParam(r, ItemID.String())
+		if buildingQueueItemID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("missing /itemid/ path parameter"))
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), BuildingQueueItemIDKey, buildingQueueItemID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
