@@ -20,19 +20,26 @@ type (
 	tResourceName    string
 )
 
-type buildingSpecs struct {
-	Multiplier []float64 `json:"multiplier"`
+type militaryBuildingSpecs struct {
+	Multiplier []float32          `json:"multiplier"`
+	Units      map[tUnitName]bool `json:"units"`
+}
+
+type economicBuildingSpecs struct {
+	Multiplier []float32              `json:"multiplier"`
+	Resources  map[tResourceName]bool `json:"resources"`
 }
 
 type unitSpecs struct {
 	UnitSpeed              float32 `json:"speed"`
-	UnitProductionSpeedSec int     `json:"production_speed"`
+	UnitProductionSpeedSec int     `json:"productionSpeed"`
 }
 
 type gameConfig struct {
-	Buildings        map[tBuildingName]buildingSpecs
-	Units            map[tUnitName]unitSpecs
-	ResourceTrickles map[tResourceName]tResourceTrickle
+	MilitaryBuildings map[tBuildingName]militaryBuildingSpecs `json:"militaryBuildings"`
+	EconomicBuildings map[tBuildingName]economicBuildingSpecs `json:"economicBuildings"`
+	Units             map[tUnitName]unitSpecs                 `json:"units"`
+	ResourceTrickles  map[tResourceName]tResourceTrickle      `json:"resources"`
 }
 
 var (

@@ -260,6 +260,44 @@ LIMIT $2
 	return results, nil
 }
 
+func (r *StickerioRepository) UpsertCity(ctx context.Context, c *dbCity) error {
+	const upsertCityQuery = `
+INSERT INTO city_view(
+id,
+city_name,
+player_id,
+location_x,
+location_y,
+b_mine_level,
+b_barracks_level,
+r_base,
+r_epoch,
+u_count)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT(id) REPLACE
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		upsertCityQuery,
+		c.id,
+		c.name,
+		c.playerID,
+		c.locationX,
+		c.locationY,
+		c.mineLevel,
+		c.barracksLevel,
+		c.resourceBase,
+		c.resourceEpoch,
+		c.unitCount,
+	)
+	if err != nil {
+		return fmt.Errorf("upsertCityQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbMovement struct {
 	id             string
 	playerID       string

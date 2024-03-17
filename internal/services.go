@@ -62,6 +62,29 @@ func cityFromDBModel(dbCity *dbCity) (*city, error) {
 	}, nil
 }
 
+func cityToDBModel(c *city) (*dbCity, error) {
+	resourceBase, err := json.Marshal(c.resourceBase)
+	if err != nil {
+		return nil, err
+	}
+	unitCount, err := json.Marshal(c.unitCount)
+	if err != nil {
+		return nil, err
+	}
+	return &dbCity{
+		id:            c.id,
+		name:          c.name,
+		playerID:      c.playerID,
+		locationX:     c.locationX,
+		locationY:     c.locationY,
+		mineLevel:     c.mineLevel,
+		barracksLevel: c.barracksLevel,
+		resourceBase:  string(resourceBase),
+		resourceEpoch: c.resourceEpoch,
+		unitCount:     string(unitCount),
+	}, nil
+}
+
 func (s *viewerService) GetCity(ctx context.Context, id, playerID string) (*city, error) {
 	dbCity, err := s.repository.GetCityInfo(ctx, id)
 	if err != nil {
@@ -134,6 +157,28 @@ func movementFromDBModel(dbMovement *dbMovement) (*movement, error) {
 		resourceCount:  resourceCount,
 		unitCount:      unitCount,
 	}, nil
+}
+
+func movementToDBModel(m *movement) (*dbMovement, error) {
+	resourceCount, err := json.Marshal(m.resourceCount)
+	if err != nil {
+		return nil, err
+	}
+	unitCount, err := json.Marshal(m.unitCount)
+	if err != nil {
+		return nil, err
+	}
+	return &dbMovement{
+		id:             m.id,
+		playerID:       m.playerID,
+		originID:       m.originID,
+		destinationID:  m.destinationID,
+		departureEpoch: m.departureEpoch,
+		speed:          m.speed,
+		resourceCount:  string(resourceCount),
+		unitCount:      string(unitCount),
+	}, nil
+
 }
 
 func (s *viewerService) GetMovement(ctx context.Context, id, playerID string) (*movement, error) {

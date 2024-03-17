@@ -55,6 +55,7 @@ type eventsRepository interface {
 	InsertEvent(ctx context.Context, e *event) error
 	ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error)
 	UpsertMovement(ctx context.Context, m *dbMovement) error
+	UpsertCity(ctx context.Context, m *dbCity) error
 }
 
 // The EventSourcer is the magic of this game.
@@ -178,13 +179,19 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	if err != nil {
 		return err
 	}
+	epoch := time.Now().Unix()
 
 	// validation
 	if startMovement.OriginID == startMovement.DestinationID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot move to the same city")
 	}
-	if true { // TODO: check for unit and resource count vs. the s.cityList[startMovement.OriginID]
-		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "insuficient resources/units")
+	err = recalculateResources(epoch, startMovement.ResourceCount, s.cityList[startMovement.OriginID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+	}
+	err = recalculateUnits(startMovement.UnitCount, s.cityList[startMovement.OriginID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
 
 	// insert new event
@@ -208,26 +215,31 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	}
 	s.queueEventHandling(chainEvent)
 
-	// upsert view table
-	unitCount, err := json.Marshal(startMovement.UnitCount)
-	if err != nil {
-		return err
-	}
-	resourceCount, err := json.Marshal(startMovement.ResourceCount)
-	if err != nil {
-		return err
-	}
-	m := &dbMovement{
+	// upsert view/cached table
+	m := &movement{
 		id:             string(startMovement.MovementID),
 		playerID:       string(startMovement.PlayerID),
 		originID:       string(startMovement.OriginID),
 		destinationID:  string(startMovement.DestinationID),
-		departureEpoch: int64(startMovement.DepartureEpoch),
-		unitCount:      string(unitCount),
-		resourceCount:  string(resourceCount),
+		departureEpoch: epoch,
 		speed:          getMovementSpeed(startMovement.UnitCount),
+		resourceCount:  startMovement.ResourceCount,
+		unitCount:      startMovement.UnitCount,
 	}
-	err = s.repository.UpsertMovement(ctx, m)
+	s.movementList[startMovement.MovementID] = m
+	dbm, err := movementToDBModel(m)
+	if err != nil {
+		return err
+	}
+	err = s.repository.UpsertMovement(ctx, dbm)
+	if err != nil {
+		return err
+	}
+	dbc, err := cityToDBModel(s.cityList[startMovement.OriginID])
+	if err != nil {
+		return err
+	}
+	err = s.repository.UpsertCity(ctx, dbc)
 	if err != nil {
 		return err
 	}
@@ -235,16 +247,60 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	return nil
 }
 
-func hasEnoughResources(name tResourceName, cost int64, c *city) bool {
-	resourceBase := c.resourceBase[string(name)]
-	if resourceBase > cost {
-		return true
+func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
+	missingResources := ""
+	for resourceName, resourceCost := range cost {
+		if c.resourceBase[resourceName] > resourceCost {
+			continue
+		}
+		// TODO: more efficient than this
+		currentResources := int64(float32(c.resourceBase[resourceName]) +
+			float32(epoch-c.resourceEpoch)*
+				float32(config.ResourceTrickles[tResourceName(resourceName)])*
+				config.EconomicBuildings[tBuildingName("mines")].Multiplier[c.mineLevel])
+		if currentResources > resourceCost {
+			continue
+		}
+		missingResources += fmt.Sprintf("missing %s resources", resourceName)
 	}
-	// TODO
-	return false
+	if missingResources != "" {
+		return fmt.Errorf(missingResources)
+	}
+
+	c.resourceEpoch = epoch
+	for resourceName := range c.resourceBase {
+		currentResources := int64(float32(c.resourceBase[resourceName]) +
+			float32(epoch-c.resourceEpoch)*
+				float32(config.ResourceTrickles[tResourceName(resourceName)])*
+				config.EconomicBuildings[tBuildingName("mines")].Multiplier[c.mineLevel])
+		c.resourceBase[resourceName] = currentResources - cost[resourceName]
+	}
+	return nil
+}
+
+func recalculateUnits(cost tUnitCount, c *city) error {
+	insufficientUnits := ""
+	for unitName, unitCount := range cost {
+		if c.unitCount[unitName] > unitCount {
+			continue
+		}
+		insufficientUnits += fmt.Sprintf("missing %s units", unitName)
+	}
+	if insufficientUnits != "" {
+		return fmt.Errorf(insufficientUnits)
+	}
+	for unitName, unitCount := range cost {
+		c.unitCount[unitName] -= unitCount
+	}
+	return nil
 }
 
 func getMovementSpeed(unitCount tUnitCount) float32 {
-	// TODO calculate movement speed based on the config of the slowest unit
+	for _, unitName := range slowestUnits {
+		if unitCount[string(unitName)] > 0 {
+			return config.Units[unitName].UnitSpeed
+		}
+	}
+	// NOTE: this should not happen, as movements would only happen with pre-existing units
 	return 1.0
 }

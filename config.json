@@ -3,14 +3,18 @@
     "units": {
         "stickmen": {
             "speed": 1.0,
-            "production_speed": 30
+            "productionSpeed": 30
         },
         "swordsmen": {
             "speed": 1.2,
-            "production_speed": 20
+            "productionSpeed": 20
+        },
+        "god": {
+            "speed": 1000,
+            "productionSpeed": 10000
         }
     },
-    "buildings": {
+    "militaryBuildings": {
         "barracks": {
             "multiplier": [
                 1.0,
@@ -22,6 +26,13 @@
                 0.66
             ]
         },
+        "units": {
+            "stickmen": true,
+            "swordsmen": true,
+            "god": false
+        }
+    },
+    "economicBuildings": {
         "mines": {
             "multiplier": [
                 1.0,
@@ -32,6 +43,10 @@
                 6.0,
                 10.0
             ]
+        },
+        "resources": {
+            "sticks": true,
+            "circles": true
         }
     },
     "resources": {
