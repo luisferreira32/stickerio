@@ -362,6 +362,12 @@ func withOriginCityID(cityID string) listMovementsFilterOpt {
 	}
 }
 
+func withDestinationCityID(cityID string) listMovementsFilterOpt {
+	return func() (string, interface{}) {
+		return "destination_id=", cityID
+	}
+}
+
 func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*dbMovement, error) {
 	filtersQuery := "WHERE player_id=$1 AND id>$1"
 	filtersValues := make([]interface{}, 0, len(filters))
@@ -369,7 +375,8 @@ func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastI
 	for i, filter := range filters {
 		q, v := filter()
 		filtersValues = append(filtersValues, v)
-		filtersQuery += " AND " + q + "$" + strconv.Itoa(i+4) // starts at $4 since $1 to $3 are already taken for lastID, playerID and pagination
+		// starts at $4 since $1 to $3 are already taken for lastID, playerID and pagination
+		filtersQuery += " AND " + q + "$" + strconv.Itoa(i+4)
 	}
 
 	listMovementQuery := fmt.Sprintf(`

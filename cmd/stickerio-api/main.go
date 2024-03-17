@@ -24,7 +24,7 @@ func main() {
 
 	database := internal.NewStickerioRepository(os.Getenv("DB_HOST"))
 	eventSourcer := internal.NewEventSourcer(database)
-	eventSourcer.StartEventsWorker(ctx, 5*time.Minute)
+	eventSourcer.StartEventsWorker(ctx, 10*time.Second)
 	handlers := internal.NewServerHandler(database, eventSourcer)
 
 	router := chi.NewRouter()

@@ -190,10 +190,13 @@ func (s *viewerService) GetMovement(ctx context.Context, id, playerID string) (*
 	return movementFromDBModel(movement)
 }
 
-func (s *viewerService) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, originIDFilter string) ([]*movement, error) {
+func (s *viewerService) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, originIDFilter, destinationIDFilter string) ([]*movement, error) {
 	additionalFilters := make([]listMovementsFilterOpt, 0)
 	if originIDFilter != "" {
 		additionalFilters = append(additionalFilters, withOriginCityID(originIDFilter))
+	}
+	if destinationIDFilter != "" {
+		additionalFilters = append(additionalFilters, withDestinationCityID(destinationIDFilter))
 	}
 	dbMovements, err := s.repository.ListMovements(ctx, playerID, lastID, pageSize, additionalFilters...)
 	if err != nil {
@@ -386,12 +389,12 @@ func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *
 	serverSideEpoch := time.Now().Unix()
 
 	queueItem := queueUnitEvent{
-		UnitQueueItemID: item.id,
-		CityID:          item.cityID,
-		PlayerID:        playerID,
-		QueuedEpoch:     serverSideEpoch,
+		UnitQueueItemID: tItemID(item.id),
+		CityID:          tCityID(item.cityID),
+		PlayerID:        tPlayerID(playerID),
+		QueuedEpoch:     tEpoch(serverSideEpoch),
 		UnitCount:       item.unitCount,
-		UnitType:        item.unitType,
+		UnitType:        tUnitName(item.unitType),
 	}
 	payload, err := json.Marshal(queueItem)
 	if err != nil {

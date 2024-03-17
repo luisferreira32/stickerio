@@ -172,8 +172,9 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 	originIDFilter := r.URL.Query().Get(OriginID.String())
+	destinationIDFilter := r.URL.Query().Get(DestinationID.String())
 
-	movements, err := s.viewer.ListMovements(r.Context(), playerID, lastID, pageSize, originIDFilter)
+	movements, err := s.viewer.ListMovements(r.Context(), playerID, lastID, pageSize, originIDFilter, destinationIDFilter)
 	if err != nil {
 		errHandle(w, err.Error())
 	}

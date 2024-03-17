@@ -16,6 +16,7 @@ const (
 	startMovementEventName   = "startmovement"
 	arrivalMovementEventName = "arrival"
 	queueUnitEventName       = "queueunit"
+	createUnitEventName      = "createunit"
 )
 
 var (
@@ -53,13 +54,25 @@ type arrivalMovementEvent struct {
 }
 
 // Inserted when a request to queue a unit is done.
+// If the resources of the city are enough an event is set for the future
+// to create the units.
 type queueUnitEvent struct {
-	UnitQueueItemID string `json:"unitQueueItemID"`
-	CityID          string `json:"cityID"`
-	PlayerID        string `json:"playerID"`
-	QueuedEpoch     int64  `json:"queuedEpoch"`
-	UnitCount       int32  `json:"unitCount"`
-	UnitType        string `json:"unitType"`
+	UnitQueueItemID tItemID   `json:"unitQueueItemID"`
+	CityID          tCityID   `json:"cityID"`
+	PlayerID        tPlayerID `json:"playerID"`
+	QueuedEpoch     tEpoch    `json:"queuedEpoch"`
+	UnitCount       int32     `json:"unitCount"`
+	UnitType        tUnitName `json:"unitType"`
+}
+
+// Inserted when a queueUnitEvent is processed.
+// If the cityID still belongs to the original player, new units will be added to the city.
+// If the city was conquered by a different player, nothing will happen.
+type createUnitEvent struct {
+	CityID    tCityID   `json:"cityID"`
+	PlayerID  tPlayerID `json:"playerID"`
+	UnitCount int32     `json:"unitCount"`
+	UnitType  tUnitName `json:"unitType"`
 }
 
 type eventsRepository interface {
@@ -90,9 +103,12 @@ type upsertIDs struct {
 //
 // Any of the event processors will do:
 //   - event payload parsing
-//   - event content validation
+//   - event content validation and re-calculation of current state
 //   - chain event creation
-//   - upsert on view tables
+//   - upsert on cached view tables
+//
+// After all events are processed, the actual view tables are updated.
+// Chain events are only processed on re-sync: make it so that re-sync happens often enough.
 type EventSourcer struct {
 	repository eventsRepository
 
@@ -264,13 +280,12 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	if err != nil {
 		return err
 	}
-	epoch := time.Now().Unix()
 
-	// validation
+	// validation and event calculations
 	if startMovement.OriginID == startMovement.DestinationID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot move to the same city")
 	}
-	err = recalculateResources(epoch, startMovement.ResourceCount, s.cityList[startMovement.OriginID])
+	err = recalculateResources(int64(startMovement.DepartureEpoch), startMovement.ResourceCount, s.cityList[startMovement.OriginID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -278,8 +293,11 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
+	speed := getMovementSpeed(startMovement.UnitCount)
+	distance := 1.0 // TODO calculate distance between originID -> Destination ID
+	travelDurationSec := int64(distance / float64(speed))
 
-	// insert new event
+	// insert chain events
 	arrival := &arrivalMovementEvent{
 		MovementID:    startMovement.MovementID,
 		PlayerID:      startMovement.PlayerID,
@@ -295,10 +313,13 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	chainEvent := &event{
 		id:      uuid.NewString(),
 		name:    arrivalMovementEventName,
-		epoch:   time.Now().Unix(),
+		epoch:   int64(startMovement.DepartureEpoch) + travelDurationSec,
 		payload: string(payload),
 	}
-	s.queueEventHandling(chainEvent)
+	err = s.repository.InsertEvent(ctx, chainEvent)
+	if err != nil {
+		return err
+	}
 
 	// upsert cached table and signal future view table upsert
 	m := &movement{
@@ -306,8 +327,8 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		playerID:       string(startMovement.PlayerID),
 		originID:       string(startMovement.OriginID),
 		destinationID:  string(startMovement.DestinationID),
-		departureEpoch: epoch,
-		speed:          getMovementSpeed(startMovement.UnitCount),
+		departureEpoch: int64(startMovement.DepartureEpoch),
+		speed:          speed,
 		resourceCount:  startMovement.ResourceCount,
 		unitCount:      startMovement.UnitCount,
 	}
@@ -318,9 +339,14 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	return nil
 }
 
-func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event) error {
+func (s *EventSourcer) processArrivalMovementEvent(_ context.Context, e *event) error {
 	// parsing
-	// validation
+	arrivalMovement := arrivalMovementEvent{}
+	err := json.Unmarshal([]byte(e.payload), &arrivalMovement)
+	if err != nil {
+		return err
+	}
+	// validation and event calculations
 	// insert chain events
 	// upsert cached table and signal future view table upsert
 	return nil
@@ -328,9 +354,73 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 
 func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) error {
 	// parsing
-	// validation
+	queueUnit := queueUnitEvent{}
+	err := json.Unmarshal([]byte(e.payload), &queueUnit)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	err = recalculateResources(int64(queueUnit.QueuedEpoch), config.Units[queueUnit.UnitType].UnitCost, s.cityList[queueUnit.CityID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+	}
+	trainingDurationSec := getTrainingDuration(queueUnit.UnitCount, queueUnit.UnitType, s.cityList[queueUnit.CityID])
+
 	// insert chain events
+	createUnit := &createUnitEvent{
+		CityID:    queueUnit.CityID,
+		PlayerID:  queueUnit.PlayerID,
+		UnitCount: queueUnit.UnitCount,
+		UnitType:  queueUnit.UnitType,
+	}
+	payload, err := json.Marshal(createUnit)
+	if err != nil {
+		return err
+	}
+	chainEvent := &event{
+		id:      uuid.NewString(),
+		name:    createUnitEventName,
+		epoch:   int64(queueUnit.QueuedEpoch) + int64(trainingDurationSec),
+		payload: string(payload),
+	}
+	err = s.repository.InsertEvent(ctx, chainEvent)
+	if err != nil {
+		return err
+	}
+
 	// upsert cached table and signal future view table upsert
+	queueItem := &unitQueueItem{
+		id:          string(queueUnit.UnitQueueItemID),
+		cityID:      string(queueUnit.CityID),
+		queuedEpoch: int64(queueUnit.QueuedEpoch),
+		durationSec: trainingDurationSec,
+		unitCount:   int32(queueUnit.UnitCount),
+		unitType:    string(queueUnit.UnitType),
+	}
+	s.toUpsert.unitQ[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = struct{}{}
+
+	return nil
+}
+
+func (s *EventSourcer) processCreateUnitEvent(_ context.Context, e *event) error {
+	// parsing
+	createUnit := createUnitEvent{}
+	err := json.Unmarshal([]byte(e.payload), &createUnit)
+	if err != nil {
+		return err
+	}
+	// validation and event calculations
+	if createUnit.PlayerID != tPlayerID(s.cityList[createUnit.CityID].playerID) {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "city has changed owner")
+	}
+	s.cityList[createUnit.CityID].unitCount[string(createUnit.UnitType)] += int64(createUnit.UnitCount)
+
+	// insert chain events
+
+	// upsert cached table and signal future view table upsert
+	s.toUpsert.cities[createUnit.CityID] = struct{}{}
+
 	return nil
 }
 
@@ -340,7 +430,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		if c.resourceBase[resourceName] > resourceCost {
 			continue
 		}
-		// TODO: more efficient than this
+		// TODO: more efficient than this - and less hardcoded...
 		currentResources := int64(float32(c.resourceBase[resourceName]) +
 			float32(epoch-c.resourceEpoch)*
 				float32(config.ResourceTrickles[tResourceName(resourceName)])*
@@ -390,4 +480,10 @@ func getMovementSpeed(unitCount tUnitCount) float32 {
 	}
 	// NOTE: this should not happen, as movements would only happen with pre-existing units
 	return 1.0
+}
+
+func getTrainingDuration(unitCount int32, unitName tUnitName, c *city) int32 {
+	// TODO: more efficient than this - and less hardcoded...
+	return int32(float32(config.Units[unitName].UnitProductionSpeedSec*unitCount) *
+		config.MilitaryBuildings[tBuildingName("barracks")].Multiplier[c.barracksLevel])
 }
