@@ -39,6 +39,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/v1CityInfo'
+    post:
+      summary: Create a city.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/v1CityInfo'
+      responses:
+        '201':
+          description: Created
   /v1/cities/{cityid}:
     get:
       summary: Get a city complete state.

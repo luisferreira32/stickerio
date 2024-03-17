@@ -1017,6 +1017,103 @@ func (a *DefaultAPIService) V1CitiesGetExecute(r ApiV1CitiesGetRequest) ([]V1Cit
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiV1CitiesPostRequest struct {
+	ctx context.Context
+	ApiService *DefaultAPIService
+	v1CityInfo *V1CityInfo
+}
+
+func (r ApiV1CitiesPostRequest) V1CityInfo(v1CityInfo V1CityInfo) ApiV1CitiesPostRequest {
+	r.v1CityInfo = &v1CityInfo
+	return r
+}
+
+func (r ApiV1CitiesPostRequest) Execute() (*http.Response, error) {
+	return r.ApiService.V1CitiesPostExecute(r)
+}
+
+/*
+V1CitiesPost Create a city.
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiV1CitiesPostRequest
+*/
+func (a *DefaultAPIService) V1CitiesPost(ctx context.Context) ApiV1CitiesPostRequest {
+	return ApiV1CitiesPostRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (*http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1CitiesPost")
+	if err != nil {
+		return nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/cities"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.v1CityInfo == nil {
+		return nil, reportError("v1CityInfo is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.v1CityInfo
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		return localVarHTTPResponse, newErr
+	}
+
+	return localVarHTTPResponse, nil
+}
+
 type ApiV1MovementsGetRequest struct {
 	ctx context.Context
 	ApiService *DefaultAPIService

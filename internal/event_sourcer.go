@@ -20,6 +20,7 @@ const (
 	createUnitEventName      = "createunit"
 	queueBuildingEventName   = "queuebuilding"
 	upgradeBuildingEventName = "upgradebuilding"
+	createCityEventName      = "createcity"
 )
 
 var (
@@ -102,6 +103,14 @@ type upgradeBuildingEvent struct {
 	PlayerID            tPlayerID     `json:"playerID"`
 	TargetLevel         int64         `json:"targetLevel"`
 	TargetBuilding      tBuildingName `json:"targetBuilding"`
+}
+
+// Inserted when a city is founded.
+// If the current location was already occupied in the mean-time, the handling generates an arrival event.
+// If the current location was free, the city is created and all units/resources are added to the newly
+// created city.
+type createCityEvent struct {
+	// TODO missing a bunch of info, including starting resources (e.g., you create when you move w/ resources)
 }
 
 type eventsRepository interface {
