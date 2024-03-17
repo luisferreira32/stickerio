@@ -148,6 +148,8 @@ type movement struct {
 	playerID       string
 	originID       string
 	destinationID  string
+	destinationX   int32
+	destinationY   int32
 	departureEpoch int64
 	speed          float64
 	resourceCount  map[string]int64
@@ -170,6 +172,8 @@ func movementFromDBModel(dbMovement *dbMovement) (*movement, error) {
 		playerID:       dbMovement.playerID,
 		originID:       dbMovement.originID,
 		destinationID:  dbMovement.destinationID,
+		destinationX:   dbMovement.destinationX,
+		destinationY:   dbMovement.destinationY,
 		departureEpoch: dbMovement.departureEpoch,
 		speed:          dbMovement.speed,
 		resourceCount:  resourceCount,
@@ -191,6 +195,8 @@ func movementToDBModel(m *movement) (*dbMovement, error) {
 		playerID:       m.playerID,
 		originID:       m.originID,
 		destinationID:  m.destinationID,
+		destinationX:   m.destinationX,
+		destinationY:   m.destinationY,
 		departureEpoch: m.departureEpoch,
 		speed:          m.speed,
 		resourceCount:  string(resourceCount),
@@ -378,6 +384,8 @@ func (s *inserterService) StartMovement(ctx context.Context, playerID string, m 
 		PlayerID:       tPlayerID(playerID),
 		OriginID:       tCityID(m.originID),
 		DestinationID:  tCityID(m.destinationID),
+		DestinationX:   m.destinationX,
+		DestinationY:   m.destinationY,
 		DepartureEpoch: tEpoch(serverSideEpoch),
 		UnitCount:      m.unitCount,
 		ResourceCount:  m.resourceCount,

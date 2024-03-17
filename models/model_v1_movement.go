@@ -25,6 +25,8 @@ type V1Movement struct {
 	PlayerID string `json:"playerID"`
 	OriginID string `json:"originID"`
 	DestinationID string `json:"destinationID"`
+	DestinationX int32 `json:"destinationX"`
+	DestinationY int32 `json:"destinationY"`
 	DepartureEpoch int64 `json:"departureEpoch"`
 	Speed float64 `json:"speed"`
 	UnitCount map[string]int64 `json:"unitCount"`
@@ -37,12 +39,14 @@ type _V1Movement V1Movement
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1Movement(id string, playerID string, originID string, destinationID string, departureEpoch int64, speed float64, unitCount map[string]int64, resourceCount map[string]int64) *V1Movement {
+func NewV1Movement(id string, playerID string, originID string, destinationID string, destinationX int32, destinationY int32, departureEpoch int64, speed float64, unitCount map[string]int64, resourceCount map[string]int64) *V1Movement {
 	this := V1Movement{}
 	this.Id = id
 	this.PlayerID = playerID
 	this.OriginID = originID
 	this.DestinationID = destinationID
+	this.DestinationX = destinationX
+	this.DestinationY = destinationY
 	this.DepartureEpoch = departureEpoch
 	this.Speed = speed
 	this.UnitCount = unitCount
@@ -152,6 +156,54 @@ func (o *V1Movement) GetDestinationIDOk() (*string, bool) {
 // SetDestinationID sets field value
 func (o *V1Movement) SetDestinationID(v string) {
 	o.DestinationID = v
+}
+
+// GetDestinationX returns the DestinationX field value
+func (o *V1Movement) GetDestinationX() int32 {
+	if o == nil {
+		var ret int32
+		return ret
+	}
+
+	return o.DestinationX
+}
+
+// GetDestinationXOk returns a tuple with the DestinationX field value
+// and a boolean to check if the value has been set.
+func (o *V1Movement) GetDestinationXOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.DestinationX, true
+}
+
+// SetDestinationX sets field value
+func (o *V1Movement) SetDestinationX(v int32) {
+	o.DestinationX = v
+}
+
+// GetDestinationY returns the DestinationY field value
+func (o *V1Movement) GetDestinationY() int32 {
+	if o == nil {
+		var ret int32
+		return ret
+	}
+
+	return o.DestinationY
+}
+
+// GetDestinationYOk returns a tuple with the DestinationY field value
+// and a boolean to check if the value has been set.
+func (o *V1Movement) GetDestinationYOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.DestinationY, true
+}
+
+// SetDestinationY sets field value
+func (o *V1Movement) SetDestinationY(v int32) {
+	o.DestinationY = v
 }
 
 // GetDepartureEpoch returns the DepartureEpoch field value
@@ -264,6 +316,8 @@ func (o V1Movement) ToMap() (map[string]interface{}, error) {
 	toSerialize["playerID"] = o.PlayerID
 	toSerialize["originID"] = o.OriginID
 	toSerialize["destinationID"] = o.DestinationID
+	toSerialize["destinationX"] = o.DestinationX
+	toSerialize["destinationY"] = o.DestinationY
 	toSerialize["departureEpoch"] = o.DepartureEpoch
 	toSerialize["speed"] = o.Speed
 	toSerialize["unitCount"] = o.UnitCount
@@ -280,6 +334,8 @@ func (o *V1Movement) UnmarshalJSON(data []byte) (err error) {
 		"playerID",
 		"originID",
 		"destinationID",
+		"destinationX",
+		"destinationY",
 		"departureEpoch",
 		"speed",
 		"unitCount",

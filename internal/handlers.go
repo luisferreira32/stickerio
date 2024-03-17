@@ -144,6 +144,8 @@ func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
 		PlayerID:       movement.playerID,
 		OriginID:       movement.originID,
 		DestinationID:  movement.destinationID,
+		DestinationX:   movement.destinationX,
+		DestinationY:   movement.destinationY,
 		DepartureEpoch: movement.departureEpoch,
 		Speed:          movement.speed,
 		UnitCount:      movement.unitCount,
@@ -184,6 +186,8 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 		movementsList[i].PlayerID = movement.playerID
 		movementsList[i].OriginID = movement.originID
 		movementsList[i].DestinationID = movement.destinationID
+		movementsList[i].DestinationX = movement.destinationX
+		movementsList[i].DestinationY = movement.destinationY
 		movementsList[i].DepartureEpoch = movement.departureEpoch
 		movementsList[i].Speed = movement.speed
 		movementsList[i].UnitCount = movement.unitCount
@@ -370,6 +374,8 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 		id:            m.Id,
 		originID:      m.OriginID,
 		destinationID: m.DestinationID,
+		destinationX:  m.DestinationX,
+		destinationY:  m.DestinationY,
 		resourceCount: m.ResourceCount,
 		unitCount:     m.UnitCount,
 	})

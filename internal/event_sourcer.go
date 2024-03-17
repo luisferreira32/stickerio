@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -33,6 +34,8 @@ type startMovementEvent struct {
 	PlayerID       tPlayerID      `json:"playerID"`
 	OriginID       tCityID        `json:"originID"`
 	DestinationID  tCityID        `json:"destinationID"`
+	DestinationX   int32          `json:"destinationX"`
+	DestinationY   int32          `json:"destinationY"`
 	DepartureEpoch tEpoch         `json:"departureEpoch"`
 	UnitCount      tUnitCount     `json:"unitCount"`
 	ResourceCount  tResourceCount `json:"resourceCount"`
@@ -49,6 +52,8 @@ type arrivalMovementEvent struct {
 	PlayerID      tPlayerID      `json:"playerID"`
 	OriginID      tCityID        `json:"originID"`
 	DestinationID tCityID        `json:"destinationID"`
+	DestinationX  int32          `json:"destinationX"`
+	DestinationY  int32          `json:"destinationY"`
 	UnitCount     tUnitCount     `json:"unitCount"`
 	ResourceCount tResourceCount `json:"resourceCount"`
 }
@@ -294,7 +299,12 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
 	speed := getMovementSpeed(startMovement.UnitCount)
-	distance := 1.0 // TODO calculate distance between originID -> Destination ID
+	distance := dist(
+		s.cityList[startMovement.OriginID].locationX,
+		s.cityList[startMovement.OriginID].locationY,
+		startMovement.DestinationX,
+		startMovement.DestinationY,
+	)
 	travelDurationSec := int64(distance / speed)
 
 	// insert chain events
@@ -303,6 +313,8 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		PlayerID:      startMovement.PlayerID,
 		OriginID:      startMovement.OriginID,
 		DestinationID: startMovement.DestinationID,
+		DestinationX:  startMovement.DestinationX,
+		DestinationY:  startMovement.DestinationY,
 		UnitCount:     startMovement.UnitCount,
 		ResourceCount: startMovement.ResourceCount,
 	}
@@ -327,6 +339,8 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		playerID:       string(startMovement.PlayerID),
 		originID:       string(startMovement.OriginID),
 		destinationID:  string(startMovement.DestinationID),
+		destinationX:   startMovement.DestinationX,
+		destinationY:   startMovement.DestinationY,
 		departureEpoch: int64(startMovement.DepartureEpoch),
 		speed:          speed,
 		resourceCount:  startMovement.ResourceCount,
@@ -346,7 +360,24 @@ func (s *EventSourcer) processArrivalMovementEvent(_ context.Context, e *event) 
 	if err != nil {
 		return err
 	}
+
 	// validation and event calculations
+	switch {
+	case arrivalMovement.DestinationID == "":
+		// TODO:
+		// might be have been an empty spot when the movement started
+		// check if location X,Y were colonized or not
+		// if not - forage random value of resources and go back to originID
+	case arrivalMovement.PlayerID == tPlayerID(s.cityList[arrivalMovement.DestinationID].playerID):
+		// TODO:
+		// we've arrived at a friendly city: reinforce the units and top-up resource bases
+	case arrivalMovement.PlayerID != tPlayerID(s.cityList[arrivalMovement.DestinationID].playerID):
+		// TODO:
+		// calculate battle. if units survive, calculate plunder and chain a start movement event
+		// if units all die, don't chain another event, just subtract units from the destination ID
+		// TODO: future aliances possibility and treat this as a permanent reinforcement (?)
+	}
+
 	// insert chain events
 	// upsert cached table and signal future view table upsert
 	return nil
@@ -430,7 +461,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		if c.resourceBase[resourceName] > resourceCost {
 			continue
 		}
-		// TODO: more efficient than this
+		// TODO: measure and optimize
 		multiplier := 1.0
 		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
@@ -491,11 +522,20 @@ func getMovementSpeed(unitCount tUnitCount) float64 {
 }
 
 func getTrainingDuration(unitCount int64, unitName tUnitName, c *city) int64 {
-	// TODO: more efficient than this
+	// TODO: measure and optimize
 	multiplier := 1.0
 	for _, buildingKey := range readOnlyTrainingMultipliers[unitName] {
 		// TODO: formalize these equations to calculate game time
 		multiplier *= readOnlyConfig.MilitaryBuildings[buildingKey].Multiplier[c.militaryBuildingsLevel[string(buildingKey)]]
 	}
 	return int64(float64(readOnlyConfig.Units[unitName].UnitProductionSpeedSec*unitCount) * multiplier)
+}
+
+func dist(x1, y1, x2, y2 int32) float64 {
+	// TODO: measure and optimize
+	squareDist := (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)
+	if squareDist <= 0 {
+		return 0.0
+	}
+	return math.Sqrt(float64(squareDist))
 }

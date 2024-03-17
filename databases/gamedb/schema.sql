@@ -29,6 +29,8 @@ create table if not exists movements_view (
     player_id text,
     origin_id text,
     destination_id text,
+    destination_x int,
+    destination_y int,
     departure_epoch int,
     speed real,
     r_count text, -- json serialization of resourceID: count
