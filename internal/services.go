@@ -231,6 +231,17 @@ func unitQueueItemFromDBModel(item *dbUnitQueueItem) *unitQueueItem {
 	}
 }
 
+func unitQueueItemToDBModel(item *unitQueueItem) *dbUnitQueueItem {
+	return &dbUnitQueueItem{
+		id:          item.id,
+		cityID:      item.cityID,
+		queuedEpoch: item.queuedEpoch,
+		durationSec: item.durationSec,
+		unitCount:   item.unitCount,
+		unitType:    item.unitType,
+	}
+}
+
 func (s *viewerService) GetUnitQueueItem(ctx context.Context, id, cityID, playerID string) (*unitQueueItem, error) {
 	city, err := s.repository.GetCity(ctx, cityID, playerID)
 	if err != nil {
@@ -273,6 +284,16 @@ type buildingQueueItem struct {
 
 func buildingQueueItemFromDBModel(item *dbBuildingQueueItem) *buildingQueueItem {
 	return &buildingQueueItem{
+		id:             item.id,
+		queuedEpoch:    item.queuedEpoch,
+		durationSec:    item.durationSec,
+		targetLevel:    item.targetLevel,
+		targetBuilding: item.targetBuilding,
+	}
+}
+
+func buildingQueueItemToDBModel(item *buildingQueueItem) *dbBuildingQueueItem {
+	return &dbBuildingQueueItem{
 		id:             item.id,
 		queuedEpoch:    item.queuedEpoch,
 		durationSec:    item.durationSec,

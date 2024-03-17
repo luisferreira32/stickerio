@@ -67,6 +67,15 @@ type eventsRepository interface {
 	ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error)
 	UpsertMovement(ctx context.Context, m *dbMovement) error
 	UpsertCity(ctx context.Context, m *dbCity) error
+	UpsertUnitQueueItem(ctx context.Context, m *dbUnitQueueItem) error
+	UpsertBuildingQueueItem(ctx context.Context, m *dbBuildingQueueItem) error
+}
+
+type upsertIDs struct {
+	cities    map[tCityID]struct{}
+	movements map[tMovementID]struct{}
+	unitQ     map[tCityID]map[tItemID]struct{}
+	buildingQ map[tCityID]map[tItemID]struct{}
 }
 
 // The EventSourcer is the magic of this game.
@@ -92,6 +101,9 @@ type EventSourcer struct {
 	movementList          map[tMovementID]*movement
 	unitQueuesPerCity     map[tCityID]map[tItemID]*unitQueueItem
 	buildingQueuesPerCity map[tCityID]map[tItemID]*buildingQueueItem
+	// Goes through a phase of population and deletion while inMemoryStateLock
+	// is locked. Utilized to seletively upsert changes to the views.
+	toUpsert upsertIDs
 
 	internalEventQueue chan *event
 }
@@ -101,6 +113,12 @@ func NewEventSourcer(repository eventsRepository) *EventSourcer {
 		repository:         repository,
 		inMemoryStateLock:  &sync.Mutex{},
 		internalEventQueue: make(chan *event, 100),
+		toUpsert: upsertIDs{
+			cities:    make(map[tCityID]struct{}),
+			movements: make(map[tMovementID]struct{}),
+			unitQ:     make(map[tCityID]map[tItemID]struct{}),
+			buildingQ: make(map[tCityID]map[tItemID]struct{}),
+		},
 	}
 }
 
@@ -151,6 +169,9 @@ func (s *EventSourcer) processEvent(ctx context.Context, e *event) error {
 	case queueUnitEventName:
 	}
 
+	// upsert view tables to upsert and clear the maps
+	s.upsertViews(ctx)
+
 	return nil
 }
 
@@ -182,6 +203,57 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 		}
 	}
 
+	// upsert view tables to upsert and clear the maps
+	s.upsertViews(ctx)
+
+	return nil
+}
+
+func (s *EventSourcer) upsertViews(ctx context.Context) error {
+	for cityID := range s.toUpsert.cities {
+		dbc, err := cityToDBModel(s.cityList[cityID])
+		if err != nil {
+			return err
+		}
+		err = s.repository.UpsertCity(ctx, dbc)
+		if err != nil {
+			return err
+		}
+	}
+	for movementID := range s.toUpsert.movements {
+		dbm, err := movementToDBModel(s.movementList[movementID])
+		if err != nil {
+			return err
+		}
+		err = s.repository.UpsertMovement(ctx, dbm)
+		if err != nil {
+			return err
+		}
+	}
+	for cityID, unitQ := range s.toUpsert.unitQ {
+		for itemID := range unitQ {
+			dbitem := unitQueueItemToDBModel(s.unitQueuesPerCity[cityID][itemID])
+			err := s.repository.UpsertUnitQueueItem(ctx, dbitem)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	for cityID, unitQ := range s.toUpsert.buildingQ {
+		for itemID := range unitQ {
+			dbitem := buildingQueueItemToDBModel(s.buildingQueuesPerCity[cityID][itemID])
+			err := s.repository.UpsertBuildingQueueItem(ctx, dbitem)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	s.toUpsert = upsertIDs{
+		cities:    make(map[tCityID]struct{}),
+		movements: make(map[tMovementID]struct{}),
+		unitQ:     make(map[tCityID]map[tItemID]struct{}),
+		buildingQ: make(map[tCityID]map[tItemID]struct{}),
+	}
 	return nil
 }
 
@@ -228,7 +300,7 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	}
 	s.queueEventHandling(chainEvent)
 
-	// upsert view/cached table
+	// upsert cached table and signal future view table upsert
 	m := &movement{
 		id:             string(startMovement.MovementID),
 		playerID:       string(startMovement.PlayerID),
@@ -240,22 +312,8 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		unitCount:      startMovement.UnitCount,
 	}
 	s.movementList[startMovement.MovementID] = m
-	dbm, err := movementToDBModel(m)
-	if err != nil {
-		return err
-	}
-	err = s.repository.UpsertMovement(ctx, dbm)
-	if err != nil {
-		return err
-	}
-	dbc, err := cityToDBModel(s.cityList[startMovement.OriginID])
-	if err != nil {
-		return err
-	}
-	err = s.repository.UpsertCity(ctx, dbc)
-	if err != nil {
-		return err
-	}
+	s.toUpsert.movements[startMovement.MovementID] = struct{}{}
+	s.toUpsert.cities[startMovement.OriginID] = struct{}{}
 
 	return nil
 }
@@ -264,7 +322,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 	// parsing
 	// validation
 	// insert chain events
-	// upsert view tables
+	// upsert cached table and signal future view table upsert
 	return nil
 }
 
@@ -272,7 +330,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	// parsing
 	// validation
 	// insert chain events
-	// upsert view tables
+	// upsert cached table and signal future view table upsert
 	return nil
 }
 
