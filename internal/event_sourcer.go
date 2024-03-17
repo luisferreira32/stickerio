@@ -68,7 +68,6 @@ type queueUnitEvent struct {
 	UnitQueueItemID tItemID   `json:"unitQueueItemID"`
 	CityID          tCityID   `json:"cityID"`
 	PlayerID        tPlayerID `json:"playerID"`
-	QueuedEpoch     tEpoch    `json:"queuedEpoch"`
 	UnitCount       int64     `json:"unitCount"`
 	UnitType        tUnitName `json:"unitType"`
 }
@@ -89,7 +88,6 @@ type queueBuildingEvent struct {
 	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
 	CityID              tCityID       `json:"cityID"`
 	PlayerID            tPlayerID     `json:"playerID"`
-	QueuedEpoch         tEpoch        `json:"queuedEpoch"`
 	TargetLevel         int64         `json:"targetLevel"`
 	TargetBuilding      tBuildingName `json:"targetBuilding"`
 }
@@ -110,7 +108,13 @@ type upgradeBuildingEvent struct {
 // If the current location was free, the city is created and all units/resources are added to the newly
 // created city.
 type createCityEvent struct {
-	// TODO missing a bunch of info, including starting resources (e.g., you create when you move w/ resources)
+	CityID        tCityID        `json:"cityID"`
+	Name          string         `json:"name"`
+	PlayerID      tPlayerID      `json:"playerID"`
+	LocationX     int32          `json:"locationX"`
+	LocationY     int32          `json:"locationY"`
+	ResourceCount tResourceCount `json:"resourceCount"`
+	UnitCount     tUnitCount     `json:"unitCount"`
 }
 
 type eventsRepository interface {
@@ -168,9 +172,13 @@ type EventSourcer struct {
 
 func NewEventSourcer(repository eventsRepository) *EventSourcer {
 	return &EventSourcer{
-		repository:         repository,
-		inMemoryStateLock:  &sync.Mutex{},
-		internalEventQueue: make(chan *event, 100),
+		repository:            repository,
+		inMemoryStateLock:     &sync.Mutex{},
+		internalEventQueue:    make(chan *event, 100),
+		cityList:              make(map[tCityID]*city),
+		movementList:          make(map[tMovementID]*movement),
+		unitQueuesPerCity:     make(map[tCityID]map[tItemID]*unitQueueItem),
+		buildingQueuesPerCity: make(map[tCityID]map[tItemID]*buildingQueueItem),
 		toUpsert: upsertIDs{
 			cities:    make(map[tCityID]struct{}),
 			movements: make(map[tMovementID]struct{}),
@@ -217,14 +225,27 @@ func (s *EventSourcer) processEvent(ctx context.Context, e *event) error {
 	s.inMemoryStateLock.Lock()
 	defer s.inMemoryStateLock.Unlock()
 
+	var (
+		err error
+	)
 	switch e.name {
 	case startMovementEventName:
-		err := s.processStartMovementEvent(ctx, e)
-		if err != nil {
-			return err
-		}
+		err = s.processStartMovementEvent(ctx, e)
 	case arrivalMovementEventName:
+		err = s.processArrivalMovementEvent(ctx, e)
 	case queueUnitEventName:
+		err = s.processQueueUnitEventName(ctx, e)
+	case createUnitEventName:
+		err = s.processCreateUnitEvent(ctx, e)
+	case queueBuildingEventName:
+		err = s.processQueueBuildingEvent(ctx, e)
+	case upgradeBuildingEventName:
+		err = s.processUpgradeBuildingEvent(ctx, e)
+	case createCityEventName:
+		err = s.processCreateCityEvent(ctx, e)
+	}
+	if err != nil {
+		return err
 	}
 
 	// upsert view tables to upsert and clear the maps
@@ -242,6 +263,12 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 	s.inMemoryStateLock.Lock()
 	defer s.inMemoryStateLock.Unlock()
 
+	// clear previous state to re-sync to correctly calculated present state
+	s.cityList = make(map[tCityID]*city)
+	s.movementList = make(map[tMovementID]*movement)
+	s.unitQueuesPerCity = make(map[tCityID]map[tItemID]*unitQueueItem)
+	s.buildingQueuesPerCity = make(map[tCityID]map[tItemID]*buildingQueueItem)
+
 	var (
 		e *event
 	)
@@ -249,15 +276,27 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 		e = events[i]
 		switch e.name {
 		case startMovementEventName:
-			err := s.processStartMovementEvent(ctx, e)
-			if err != nil {
-				if errors.Is(err, errPreConditionFailed) {
-					continue
-				}
-				return err
-			}
+			err = s.processStartMovementEvent(ctx, e)
 		case arrivalMovementEventName:
+			err = s.processArrivalMovementEvent(ctx, e)
 		case queueUnitEventName:
+			err = s.processQueueUnitEventName(ctx, e)
+		case createUnitEventName:
+			err = s.processCreateUnitEvent(ctx, e)
+		case queueBuildingEventName:
+			err = s.processQueueBuildingEvent(ctx, e)
+		case upgradeBuildingEventName:
+			err = s.processUpgradeBuildingEvent(ctx, e)
+		case createCityEventName:
+			err = s.processCreateCityEvent(ctx, e)
+		default:
+			err = fmt.Errorf("%w, event %s, reason: %s %s", errPreConditionFailed, e.id, "unkown event name", e.name)
+		}
+		if err != nil {
+			if errors.Is(err, errPreConditionFailed) {
+				continue
+			}
+			return err
 		}
 	}
 
@@ -460,7 +499,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	err = recalculateResources(int64(queueUnit.QueuedEpoch), readOnlyConfig.Units[queueUnit.UnitType].UnitCost, s.cityList[queueUnit.CityID])
+	err = recalculateResources(e.epoch, readOnlyConfig.Units[queueUnit.UnitType].UnitCost, s.cityList[queueUnit.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -481,7 +520,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	chainEvent := &event{
 		id:      uuid.NewString(),
 		name:    createUnitEventName,
-		epoch:   int64(queueUnit.QueuedEpoch) + int64(trainingDurationSec),
+		epoch:   e.epoch + trainingDurationSec,
 		payload: string(payload),
 	}
 	err = s.repository.InsertEvent(ctx, chainEvent)
@@ -493,7 +532,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	queueItem := &unitQueueItem{
 		id:          string(queueUnit.UnitQueueItemID),
 		cityID:      string(queueUnit.CityID),
-		queuedEpoch: int64(queueUnit.QueuedEpoch),
+		queuedEpoch: e.epoch,
 		durationSec: trainingDurationSec,
 		unitCount:   queueUnit.UnitCount,
 		unitType:    string(queueUnit.UnitType),
@@ -545,7 +584,7 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "only upgrade 1 level at a time")
 	}
 	upgradeCost := targetBuildingSpecs.UpgradeCost[currentBuildingLevel]
-	err = recalculateResources(int64(queueBuilding.QueuedEpoch), upgradeCost, s.cityList[queueBuilding.CityID])
+	err = recalculateResources(e.epoch, upgradeCost, s.cityList[queueBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -566,7 +605,7 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 	chainEvent := &event{
 		id:      uuid.NewString(),
 		name:    upgradeBuildingEventName,
-		epoch:   int64(queueBuilding.QueuedEpoch) + int64(upgradeDurationSec),
+		epoch:   e.epoch + upgradeDurationSec,
 		payload: string(payload),
 	}
 	err = s.repository.InsertEvent(ctx, chainEvent)
@@ -578,7 +617,7 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 	queueItem := &buildingQueueItem{
 		id:             string(queueBuilding.BuildingQueueItemID),
 		cityID:         string(queueBuilding.CityID),
-		queuedEpoch:    int64(queueBuilding.QueuedEpoch),
+		queuedEpoch:    e.epoch,
 		durationSec:    upgradeDurationSec,
 		targetLevel:    queueBuilding.TargetLevel,
 		targetBuilding: string(queueBuilding.TargetBuilding),
@@ -611,6 +650,44 @@ func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) 
 	// upsert cached table and signal future view table upsert
 	s.toUpsert.cities[upgradeBuilding.CityID] = struct{}{}
 	s.toUpsert.buildingQ[upgradeBuilding.CityID][upgradeBuilding.BuildingQueueItemID] = struct{}{}
+
+	return nil
+}
+
+func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error {
+	// parsing
+	createCity := createCityEvent{}
+	err := json.Unmarshal([]byte(e.payload), &createCity)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	if _, ok := s.cityList[createCity.CityID]; ok {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "unexpected repeated cityID")
+	}
+	// TODO: check if a city was present in the location before, if so, create a war!
+	s.cityList[createCity.CityID] = &city{
+		id:        string(createCity.CityID),
+		name:      createCity.Name,
+		playerID:  string(createCity.PlayerID),
+		locationX: createCity.LocationX,
+		locationY: createCity.LocationY,
+		// NOTE: all buildings start at level 0 in a city creation.
+		// Go default map values make it so that future calculations of
+		// level up are included.
+		buildingsLevel: make(map[string]int64),
+		resourceBase:   createCity.ResourceCount,
+		resourceEpoch:  e.epoch,
+		unitCount:      createCity.UnitCount,
+	}
+	s.buildingQueuesPerCity[createCity.CityID] = make(map[tItemID]*buildingQueueItem)
+	s.unitQueuesPerCity[createCity.CityID] = make(map[tItemID]*unitQueueItem)
+
+	// insert chain events
+
+	// upsert cached table and signal future view table upsert
+	s.toUpsert.cities[tCityID(createCity.CityID)] = struct{}{}
 
 	return nil
 }

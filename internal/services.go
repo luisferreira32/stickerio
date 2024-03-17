@@ -406,7 +406,6 @@ func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *
 		UnitQueueItemID: tItemID(item.id),
 		CityID:          tCityID(item.cityID),
 		PlayerID:        tPlayerID(playerID),
-		QueuedEpoch:     tEpoch(serverSideEpoch),
 		UnitCount:       item.unitCount,
 		UnitType:        tUnitName(item.unitType),
 	}
@@ -438,7 +437,6 @@ func (s *inserterService) QueueBuilding(ctx context.Context, playerID string, it
 		BuildingQueueItemID: tItemID(item.id),
 		CityID:              tCityID(item.cityID),
 		PlayerID:            tPlayerID(playerID),
-		QueuedEpoch:         tEpoch(serverSideEpoch),
 		TargetLevel:         item.targetLevel,
 		TargetBuilding:      tBuildingName(item.targetBuilding),
 	}
@@ -466,7 +464,19 @@ func (s *inserterService) QueueBuilding(ctx context.Context, playerID string, it
 func (s *inserterService) CreateCity(ctx context.Context, playerID string, c *city) error {
 	serverSideEpoch := time.Now().Unix()
 
-	createCity := createCityEvent{}
+	createCity := createCityEvent{
+		CityID:    tCityID(c.id),
+		Name:      c.name,
+		PlayerID:  tPlayerID(playerID),
+		LocationX: c.locationX,
+		LocationY: c.locationY,
+		// NOTE: when inserted from outside means it was first city creation
+		// this comes with no resources and units - you build from zero. Only
+		// founded cities later in the game generate events with these two
+		// fields populated.
+		ResourceCount: make(tResourceCount),
+		UnitCount:     make(tUnitCount),
+	}
 	payload, err := json.Marshal(createCity)
 	if err != nil {
 		return err
