@@ -31,8 +31,9 @@ type economicBuildingSpecs struct {
 }
 
 type unitSpecs struct {
-	UnitSpeed              float32 `json:"speed"`
-	UnitProductionSpeedSec int     `json:"productionSpeed"`
+	UnitSpeed              float32                 `json:"speed"`
+	UnitProductionSpeedSec int                     `json:"productionSpeed"`
+	UnitCost               map[tResourceName]int64 `json:"cost"`
 }
 
 type gameConfig struct {

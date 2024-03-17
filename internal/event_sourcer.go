@@ -15,6 +15,7 @@ import (
 const (
 	startMovementEventName   = "startmovement"
 	arrivalMovementEventName = "arrival"
+	queueUnitEventName       = "queueunit"
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 )
 
 // Inserted when a player starts a movement.
-// Its processing generates an arrivalMovementEvent at a later epcoh (calculated based on distance between cities / speed).
+// Its processing generates an arrivalMovementEvent at a later epoch (calculated based on distance between cities / speed).
 type startMovementEvent struct {
 	MovementID     tMovementID    `json:"movementID"`
 	PlayerID       tPlayerID      `json:"playerID"`
@@ -49,6 +50,16 @@ type arrivalMovementEvent struct {
 	DestinationID tCityID        `json:"destinationID"`
 	UnitCount     tUnitCount     `json:"unitCount"`
 	ResourceCount tResourceCount `json:"resourceCount"`
+}
+
+// Inserted when a request to queue a unit is done.
+type queueUnitEvent struct {
+	UnitQueueItemID string `json:"unitQueueItemID"`
+	CityID          string `json:"cityID"`
+	PlayerID        string `json:"playerID"`
+	QueuedEpoch     int64  `json:"queuedEpoch"`
+	UnitCount       int32  `json:"unitCount"`
+	UnitType        string `json:"unitType"`
 }
 
 type eventsRepository interface {
@@ -137,6 +148,7 @@ func (s *EventSourcer) processEvent(ctx context.Context, e *event) error {
 			return err
 		}
 	case arrivalMovementEventName:
+	case queueUnitEventName:
 	}
 
 	return nil
@@ -166,6 +178,7 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 				return err
 			}
 		case arrivalMovementEventName:
+		case queueUnitEventName:
 		}
 	}
 
@@ -244,6 +257,22 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		return err
 	}
 
+	return nil
+}
+
+func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event) error {
+	// parsing
+	// validation
+	// insert chain events
+	// upsert view tables
+	return nil
+}
+
+func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) error {
+	// parsing
+	// validation
+	// insert chain events
+	// upsert view tables
 	return nil
 }
 

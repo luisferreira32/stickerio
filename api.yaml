@@ -97,6 +97,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/v1UnitQueueItem'
+    post:
+      summary: Add a queue item.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/v1UnitQueueItem'
+      responses:
+        '201':
+          description: Created
   /v1/cities/{cityid}/unitqitems/{itemid}:
     get:
       summary: Get a unit queue item.

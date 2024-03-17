@@ -3,11 +3,19 @@
     "units": {
         "stickmen": {
             "speed": 1.0,
-            "productionSpeed": 30
+            "productionSpeed": 30,
+            "cost": {
+                "sticks": 10,
+                "circles": 1
+            }
         },
         "swordsmen": {
             "speed": 1.2,
-            "productionSpeed": 20
+            "productionSpeed": 20,
+            "cost": {
+                "sticks": 15,
+                "circles": 5
+            }
         },
         "god": {
             "speed": 1000,

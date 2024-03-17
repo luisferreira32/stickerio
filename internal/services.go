@@ -213,6 +213,7 @@ func (s *viewerService) ListMovements(ctx context.Context, playerID, lastID stri
 
 type unitQueueItem struct {
 	id          string
+	cityID      string
 	queuedEpoch int64
 	durationSec int32
 	unitCount   int32
@@ -222,6 +223,7 @@ type unitQueueItem struct {
 func unitQueueItemFromDBModel(item *dbUnitQueueItem) *unitQueueItem {
 	return &unitQueueItem{
 		id:          item.id,
+		cityID:      item.cityID,
 		queuedEpoch: item.queuedEpoch,
 		durationSec: item.durationSec,
 		unitCount:   item.unitCount,
@@ -311,22 +313,27 @@ func (s *viewerService) ListBuildingQueueItems(ctx context.Context, cityID, play
 
 }
 
+type eventSourcer interface {
+	queueEventHandling(e *event)
+}
+
 type eventInserter interface {
 	InsertEvent(ctx context.Context, e *event) error
 }
 
 type inserterService struct {
-	repository eventInserter
+	repository   eventInserter
+	eventSourcer eventSourcer
 }
 
-func (s *inserterService) StartMovement(ctx context.Context, m *movement) error {
+func (s *inserterService) StartMovement(ctx context.Context, playerID string, m *movement) error {
 	serverSideEpoch := time.Now().Unix()
 
 	// important: these values cannot be trusted from the API
 	// set them on the server side based on token / internal clock
 	startMovement := &startMovementEvent{
 		MovementID:     tMovementID(m.id),
-		PlayerID:       tPlayerID(m.playerID),
+		PlayerID:       tPlayerID(playerID),
 		OriginID:       tCityID(m.originID),
 		DestinationID:  tCityID(m.destinationID),
 		DepartureEpoch: tEpoch(serverSideEpoch),
@@ -340,9 +347,48 @@ func (s *inserterService) StartMovement(ctx context.Context, m *movement) error 
 	}
 
 	eventID := uuid.NewString()
-	return s.repository.InsertEvent(ctx, &event{
+	e := &event{
 		id:      eventID,
+		name:    startMovementEventName,
 		epoch:   serverSideEpoch,
-		payload: string(payload), // json marshalled bytes are valid UTF-8 strings
-	})
+		payload: string(payload),
+	}
+	err = s.repository.InsertEvent(ctx, e)
+	if err != nil {
+		return err
+	}
+	s.eventSourcer.queueEventHandling(e)
+	return nil
+}
+
+func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *unitQueueItem) error {
+	serverSideEpoch := time.Now().Unix()
+
+	queueItem := queueUnitEvent{
+		UnitQueueItemID: item.id,
+		CityID:          item.cityID,
+		PlayerID:        playerID,
+		QueuedEpoch:     serverSideEpoch,
+		UnitCount:       item.unitCount,
+		UnitType:        item.unitType,
+	}
+	payload, err := json.Marshal(queueItem)
+	if err != nil {
+		return err
+	}
+
+	eventID := uuid.NewString()
+	e := &event{
+		id:      eventID,
+		name:    queueUnitEventName,
+		epoch:   serverSideEpoch,
+		payload: string(payload),
+	}
+
+	err = s.repository.InsertEvent(ctx, e)
+	if err != nil {
+		return err
+	}
+	s.eventSourcer.queueEventHandling(e)
+	return nil
 }
