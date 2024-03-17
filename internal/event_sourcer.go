@@ -360,7 +360,24 @@ func (s *EventSourcer) processArrivalMovementEvent(_ context.Context, e *event) 
 	if err != nil {
 		return err
 	}
+
 	// validation and event calculations
+	switch {
+	case arrivalMovement.DestinationID == "":
+		// TODO:
+		// might be have been an empty spot when the movement started
+		// check if location X,Y were colonized or not
+		// if not - forage random value of resources and go back to originID
+	case arrivalMovement.PlayerID == tPlayerID(s.cityList[arrivalMovement.DestinationID].playerID):
+		// TODO:
+		// we've arrived at a friendly city: reinforce the units and top-up resource bases
+	case arrivalMovement.PlayerID != tPlayerID(s.cityList[arrivalMovement.DestinationID].playerID):
+		// TODO:
+		// calculate battle. if units survive, calculate plunder and chain a start movement event
+		// if units all die, don't chain another event, just subtract units from the destination ID
+		// TODO: future aliances possibility and treat this as a permanent reinforcement (?)
+	}
+
 	// insert chain events
 	// upsert cached table and signal future view table upsert
 	return nil
