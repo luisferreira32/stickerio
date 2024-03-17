@@ -50,6 +50,7 @@ type startMovementEvent struct {
 // * reinforce if it's from the same player;
 // * battle if it's from separate player
 // * forage if it's abandoned
+// * create a new city if the unit type sent has the capability for settling
 // Then, based on survival (if any), if the current city is not owned by the player (i.e., it was not a reinforce), re-calculate a startMovement event and schedule it.
 type arrivalMovementEvent struct {
 	MovementID    tMovementID    `json:"movementID"`
@@ -105,9 +106,9 @@ type upgradeBuildingEvent struct {
 }
 
 // Inserted when a city is founded.
-// If the current location was already occupied in the mean-time, the handling generates an arrival event.
-// If the current location was free, the city is created and all units/resources are added to the newly
-// created city.
+// The city is created and all units/resources are added to the newly created city.
+// Note that this event might only be created for available locations, an arrival event
+// might also generate a createCityEvent if the conditions are met.
 type createCityEvent struct {
 	CityID        tCityID        `json:"cityID"`
 	Name          string         `json:"name"`
@@ -179,16 +180,13 @@ type EventSourcer struct {
 }
 
 func NewEventSourcer(repository eventsRepository) *EventSourcer {
+	inMemoryState := &inMemoryStorage{}
+	inMemoryState.clear()
 	return &EventSourcer{
 		repository:         repository,
 		inMemoryStateLock:  &sync.Mutex{},
 		internalEventQueue: make(chan *event, 100),
-		inMemoryState: &inMemoryStorage{
-			cityList:              make(map[tCityID]*city),
-			movementList:          make(map[tMovementID]*movement),
-			unitQueuesPerCity:     make(map[tCityID]map[tItemID]*unitQueueItem),
-			buildingQueuesPerCity: make(map[tCityID]map[tItemID]*buildingQueueItem),
-		},
+		inMemoryState:      inMemoryState,
 		toUpsert: upsertIDs{
 			cities:    make(map[tCityID]struct{}),
 			movements: make(map[tMovementID]struct{}),
@@ -703,8 +701,14 @@ func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error
 	if _, ok := s.inMemoryState.cityList[createCity.CityID]; ok {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "unexpected repeated cityID")
 	}
-	// TODO: check if a city was present in the location before, if so, create a war!
-	s.inMemoryState.cityList[createCity.CityID] = &city{
+	if s.inMemoryState.getCityByLocation(createCity.LocationX, createCity.LocationY) != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "unexpected occupied location")
+	}
+
+	// insert chain events
+
+	// upsert cached table and signal future view table upsert
+	s.inMemoryState.createCity(createCity.CityID, &city{
 		id:        string(createCity.CityID),
 		name:      createCity.Name,
 		playerID:  string(createCity.PlayerID),
@@ -717,13 +721,9 @@ func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error
 		resourceBase:   createCity.ResourceCount,
 		resourceEpoch:  e.epoch,
 		unitCount:      createCity.UnitCount,
-	}
+	})
 	s.inMemoryState.buildingQueuesPerCity[createCity.CityID] = make(map[tItemID]*buildingQueueItem)
 	s.inMemoryState.unitQueuesPerCity[createCity.CityID] = make(map[tItemID]*unitQueueItem)
-
-	// insert chain events
-
-	// upsert cached table and signal future view table upsert
 	s.toUpsert.cities[tCityID(createCity.CityID)] = struct{}{}
 	return nil
 }
@@ -744,9 +744,7 @@ func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error
 	// insert chain events
 
 	// upsert cached table and signal future view table upsert
-	delete(s.inMemoryState.cityList, deleteCity.CityID)
-	delete(s.inMemoryState.buildingQueuesPerCity, deleteCity.CityID)
-	delete(s.inMemoryState.unitQueuesPerCity, deleteCity.CityID)
+	s.inMemoryState.deleteCity(deleteCity.CityID)
 	s.toUpsert.cities[tCityID(deleteCity.CityID)] = struct{}{}
 	return nil
 }
