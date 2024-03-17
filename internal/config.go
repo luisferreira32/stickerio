@@ -2,6 +2,7 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 )
@@ -21,18 +22,22 @@ type (
 )
 
 type militaryBuildingSpecs struct {
-	Multiplier []float32          `json:"multiplier"`
-	Units      map[tUnitName]bool `json:"units"`
+	Multiplier  []float64          `json:"multiplier"`
+	UpgradeCost []tResourceCount   `json:"cost"`
+	MaxLevel    int                `json:"maxLevel"`
+	Units       map[tUnitName]bool `json:"units"`
 }
 
 type economicBuildingSpecs struct {
-	Multiplier []float32              `json:"multiplier"`
-	Resources  map[tResourceName]bool `json:"resources"`
+	Multiplier  []float64              `json:"multiplier"`
+	UpgradeCost []tResourceCount       `json:"cost"`
+	MaxLevel    int                    `json:"maxLevel"`
+	Resources   map[tResourceName]bool `json:"resources"`
 }
 
 type unitSpecs struct {
-	UnitSpeed              float32        `json:"speed"`
-	UnitProductionSpeedSec int32          `json:"productionSpeed"`
+	UnitSpeed              float64        `json:"speed"`
+	UnitProductionSpeedSec int64          `json:"productionSpeed"`
 	UnitCost               tResourceCount `json:"cost"`
 }
 
@@ -44,8 +49,10 @@ type gameConfig struct {
 }
 
 var (
-	config       gameConfig
-	slowestUnits []tUnitName
+	readOnlyConfig              gameConfig
+	readOnlySlowestUnits        []tUnitName
+	readOnlyResourceMultipliers map[tResourceName][]tBuildingName
+	readOnlyTrainingMultipliers map[tUnitName][]tBuildingName
 )
 
 func init() {
@@ -54,18 +61,57 @@ func init() {
 		panic(err)
 	}
 
-	config = gameConfig{}
+	readOnlyConfig = gameConfig{}
 
-	err = json.Unmarshal(rawConfig, &config)
+	err = json.Unmarshal(rawConfig, &readOnlyConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	slowestUnits = make([]tUnitName, 0, len(config.Units))
-	for k := range config.Units {
-		slowestUnits = append(slowestUnits, k)
+	// TODO: basic checks for consistency
+	// * levels / costs / multipliers match
+	// * costs are done with existing resources
+
+	for n, v := range readOnlyConfig.EconomicBuildings {
+		if len(v.UpgradeCost) != len(v.Multiplier)-1 || len(v.UpgradeCost) != v.MaxLevel {
+			panic(fmt.Sprintf("building %s has defined %d multipliers with max level %d and %d upgrade costs", n, len(v.UpgradeCost), v.MaxLevel, len(v.Multiplier)-1))
+		}
 	}
-	sort.Slice(slowestUnits, func(i, j int) bool {
-		return config.Units[slowestUnits[i]].UnitSpeed < config.Units[slowestUnits[j]].UnitSpeed
+
+	for n, v := range readOnlyConfig.MilitaryBuildings {
+		if len(v.UpgradeCost) != len(v.Multiplier)-1 || len(v.UpgradeCost) != v.MaxLevel {
+			panic(fmt.Sprintf("building %s has defined %d multipliers with max level %d and %d upgrade costs", n, len(v.UpgradeCost), v.MaxLevel, len(v.Multiplier)-1))
+		}
+	}
+
+	// NOTE: setup some pre-calculations for easier game logic
+
+	readOnlySlowestUnits = make([]tUnitName, 0, len(readOnlyConfig.Units))
+	for k := range readOnlyConfig.Units {
+		readOnlySlowestUnits = append(readOnlySlowestUnits, k)
+	}
+	sort.Slice(readOnlySlowestUnits, func(i, j int) bool {
+		return readOnlyConfig.Units[readOnlySlowestUnits[i]].UnitSpeed < readOnlyConfig.Units[readOnlySlowestUnits[j]].UnitSpeed
 	})
+
+	readOnlyResourceMultipliers := make(map[tResourceName][]tBuildingName, len(readOnlyConfig.ResourceTrickles))
+	for resourceKey := range readOnlyConfig.ResourceTrickles {
+		readOnlyResourceMultipliers[resourceKey] = make([]tBuildingName, 0)
+		for buildingKey, building := range readOnlyConfig.EconomicBuildings {
+			if !building.Resources[resourceKey] {
+				continue
+			}
+			readOnlyResourceMultipliers[resourceKey] = append(readOnlyResourceMultipliers[resourceKey], buildingKey)
+		}
+	}
+	readOnlyTrainingMultipliers := make(map[tUnitName][]tBuildingName, len(readOnlyConfig.Units))
+	for unitKey := range readOnlyConfig.Units {
+		readOnlyTrainingMultipliers[unitKey] = make([]tBuildingName, 0)
+		for buildingKey, building := range readOnlyConfig.MilitaryBuildings {
+			if !building.Units[unitKey] {
+				continue
+			}
+			readOnlyTrainingMultipliers[unitKey] = append(readOnlyTrainingMultipliers[unitKey], buildingKey)
+		}
+	}
 }

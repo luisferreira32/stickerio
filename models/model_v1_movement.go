@@ -26,7 +26,7 @@ type V1Movement struct {
 	OriginID string `json:"originID"`
 	DestinationID string `json:"destinationID"`
 	DepartureEpoch int64 `json:"departureEpoch"`
-	Speed float32 `json:"speed"`
+	Speed float64 `json:"speed"`
 	UnitCount map[string]int64 `json:"unitCount"`
 	ResourceCount map[string]int64 `json:"resourceCount"`
 }
@@ -37,7 +37,7 @@ type _V1Movement V1Movement
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1Movement(id string, playerID string, originID string, destinationID string, departureEpoch int64, speed float32, unitCount map[string]int64, resourceCount map[string]int64) *V1Movement {
+func NewV1Movement(id string, playerID string, originID string, destinationID string, departureEpoch int64, speed float64, unitCount map[string]int64, resourceCount map[string]int64) *V1Movement {
 	this := V1Movement{}
 	this.Id = id
 	this.PlayerID = playerID
@@ -179,9 +179,9 @@ func (o *V1Movement) SetDepartureEpoch(v int64) {
 }
 
 // GetSpeed returns the Speed field value
-func (o *V1Movement) GetSpeed() float32 {
+func (o *V1Movement) GetSpeed() float64 {
 	if o == nil {
-		var ret float32
+		var ret float64
 		return ret
 	}
 
@@ -190,7 +190,7 @@ func (o *V1Movement) GetSpeed() float32 {
 
 // GetSpeedOk returns a tuple with the Speed field value
 // and a boolean to check if the value has been set.
-func (o *V1Movement) GetSpeedOk() (*float32, bool) {
+func (o *V1Movement) GetSpeedOk() (*float64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -198,7 +198,7 @@ func (o *V1Movement) GetSpeedOk() (*float32, bool) {
 }
 
 // SetSpeed sets field value
-func (o *V1Movement) SetSpeed(v float32) {
+func (o *V1Movement) SetSpeed(v float64) {
 	o.Speed = v
 }
 

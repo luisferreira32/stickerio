@@ -61,7 +61,7 @@ type queueUnitEvent struct {
 	CityID          tCityID   `json:"cityID"`
 	PlayerID        tPlayerID `json:"playerID"`
 	QueuedEpoch     tEpoch    `json:"queuedEpoch"`
-	UnitCount       int32     `json:"unitCount"`
+	UnitCount       int64     `json:"unitCount"`
 	UnitType        tUnitName `json:"unitType"`
 }
 
@@ -71,7 +71,7 @@ type queueUnitEvent struct {
 type createUnitEvent struct {
 	CityID    tCityID   `json:"cityID"`
 	PlayerID  tPlayerID `json:"playerID"`
-	UnitCount int32     `json:"unitCount"`
+	UnitCount int64     `json:"unitCount"`
 	UnitType  tUnitName `json:"unitType"`
 }
 
@@ -295,7 +295,7 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	}
 	speed := getMovementSpeed(startMovement.UnitCount)
 	distance := 1.0 // TODO calculate distance between originID -> Destination ID
-	travelDurationSec := int64(distance / float64(speed))
+	travelDurationSec := int64(distance / speed)
 
 	// insert chain events
 	arrival := &arrivalMovementEvent{
@@ -361,7 +361,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	err = recalculateResources(int64(queueUnit.QueuedEpoch), config.Units[queueUnit.UnitType].UnitCost, s.cityList[queueUnit.CityID])
+	err = recalculateResources(int64(queueUnit.QueuedEpoch), readOnlyConfig.Units[queueUnit.UnitType].UnitCost, s.cityList[queueUnit.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -395,7 +395,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 		cityID:      string(queueUnit.CityID),
 		queuedEpoch: int64(queueUnit.QueuedEpoch),
 		durationSec: trainingDurationSec,
-		unitCount:   int32(queueUnit.UnitCount),
+		unitCount:   queueUnit.UnitCount,
 		unitType:    string(queueUnit.UnitType),
 	}
 	s.toUpsert.unitQ[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = struct{}{}
@@ -430,11 +430,15 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		if c.resourceBase[resourceName] > resourceCost {
 			continue
 		}
-		// TODO: more efficient than this - and less hardcoded...
-		currentResources := int64(float32(c.resourceBase[resourceName]) +
-			float32(epoch-c.resourceEpoch)*
-				float32(config.ResourceTrickles[tResourceName(resourceName)])*
-				config.EconomicBuildings[tBuildingName("mines")].Multiplier[c.mineLevel])
+		// TODO: more efficient than this
+		multiplier := 1.0
+		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
+			// TODO: formalize these equations to calculate game time
+			multiplier *= readOnlyConfig.EconomicBuildings[buildingKey].Multiplier[c.economicBuildingsLevel[string(buildingKey)]]
+		}
+		currentResources := int64(float64(c.resourceBase[resourceName]) +
+			float64(epoch-c.resourceEpoch)*
+				float64(readOnlyConfig.ResourceTrickles[tResourceName(resourceName)])*multiplier)
 		if currentResources > resourceCost {
 			continue
 		}
@@ -446,10 +450,14 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 
 	c.resourceEpoch = epoch
 	for resourceName := range c.resourceBase {
-		currentResources := int64(float32(c.resourceBase[resourceName]) +
-			float32(epoch-c.resourceEpoch)*
-				float32(config.ResourceTrickles[tResourceName(resourceName)])*
-				config.EconomicBuildings[tBuildingName("mines")].Multiplier[c.mineLevel])
+		multiplier := 1.0
+		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
+			// TODO: formalize these equations to calculate game time
+			multiplier *= readOnlyConfig.EconomicBuildings[buildingKey].Multiplier[c.economicBuildingsLevel[string(buildingKey)]]
+		}
+		currentResources := int64(float64(c.resourceBase[resourceName]) +
+			float64(epoch-c.resourceEpoch)*
+				float64(readOnlyConfig.ResourceTrickles[tResourceName(resourceName)])*multiplier)
 		c.resourceBase[resourceName] = currentResources - cost[resourceName]
 	}
 	return nil
@@ -472,18 +480,22 @@ func recalculateUnits(cost tUnitCount, c *city) error {
 	return nil
 }
 
-func getMovementSpeed(unitCount tUnitCount) float32 {
-	for _, unitName := range slowestUnits {
+func getMovementSpeed(unitCount tUnitCount) float64 {
+	for _, unitName := range readOnlySlowestUnits {
 		if unitCount[string(unitName)] > 0 {
-			return config.Units[unitName].UnitSpeed
+			return readOnlyConfig.Units[unitName].UnitSpeed
 		}
 	}
 	// NOTE: this should not happen, as movements would only happen with pre-existing units
 	return 1.0
 }
 
-func getTrainingDuration(unitCount int32, unitName tUnitName, c *city) int32 {
-	// TODO: more efficient than this - and less hardcoded...
-	return int32(float32(config.Units[unitName].UnitProductionSpeedSec*unitCount) *
-		config.MilitaryBuildings[tBuildingName("barracks")].Multiplier[c.barracksLevel])
+func getTrainingDuration(unitCount int64, unitName tUnitName, c *city) int64 {
+	// TODO: more efficient than this
+	multiplier := 1.0
+	for _, buildingKey := range readOnlyTrainingMultipliers[unitName] {
+		// TODO: formalize these equations to calculate game time
+		multiplier *= readOnlyConfig.MilitaryBuildings[buildingKey].Multiplier[c.militaryBuildingsLevel[string(buildingKey)]]
+	}
+	return int64(float64(readOnlyConfig.Units[unitName].UnitProductionSpeedSec*unitCount) * multiplier)
 }

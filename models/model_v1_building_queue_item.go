@@ -23,7 +23,7 @@ var _ MappedNullable = &V1BuildingQueueItem{}
 type V1BuildingQueueItem struct {
 	Id string `json:"id"`
 	QueuedEpoch int64 `json:"queuedEpoch"`
-	DurationSec int32 `json:"durationSec"`
+	DurationSec int64 `json:"durationSec"`
 	Level int32 `json:"level"`
 	Building string `json:"building"`
 }
@@ -34,7 +34,7 @@ type _V1BuildingQueueItem V1BuildingQueueItem
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1BuildingQueueItem(id string, queuedEpoch int64, durationSec int32, level int32, building string) *V1BuildingQueueItem {
+func NewV1BuildingQueueItem(id string, queuedEpoch int64, durationSec int64, level int32, building string) *V1BuildingQueueItem {
 	this := V1BuildingQueueItem{}
 	this.Id = id
 	this.QueuedEpoch = queuedEpoch
@@ -101,9 +101,9 @@ func (o *V1BuildingQueueItem) SetQueuedEpoch(v int64) {
 }
 
 // GetDurationSec returns the DurationSec field value
-func (o *V1BuildingQueueItem) GetDurationSec() int32 {
+func (o *V1BuildingQueueItem) GetDurationSec() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -112,7 +112,7 @@ func (o *V1BuildingQueueItem) GetDurationSec() int32 {
 
 // GetDurationSecOk returns a tuple with the DurationSec field value
 // and a boolean to check if the value has been set.
-func (o *V1BuildingQueueItem) GetDurationSecOk() (*int32, bool) {
+func (o *V1BuildingQueueItem) GetDurationSecOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -120,7 +120,7 @@ func (o *V1BuildingQueueItem) GetDurationSecOk() (*int32, bool) {
 }
 
 // SetDurationSec sets field value
-func (o *V1BuildingQueueItem) SetDurationSec(v int32) {
+func (o *V1BuildingQueueItem) SetDurationSec(v int64) {
 	o.DurationSec = v
 }
 

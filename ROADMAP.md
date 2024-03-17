@@ -8,9 +8,9 @@ Here lies the _detailed_ roadmap of Stickerio. If you are interested in the proj
 - [x] Initial project skeletton;
 - [x] Initial table schema;
 - [x] Simple view endpoint of a single city;
-- [ ] Implement view API endpoints;
-- [ ] Migrate API configuration to a more standardized tool (e.g., proto / OAS);
-- [ ] Better separate business logic from API conversion;
+- [x] Implement view API endpoints;
+- [x] Migrate API configuration to a more standardized tool (e.g., proto / OAS);
+- [x] Better separate business logic from API conversion;
 - [ ] Experiment with generics for the repetivive code with different types;
 - [ ] Implement event insertion API endpoints (movement, upgrades, training, etc.);
 - [ ] Implement event sourcing/handling;

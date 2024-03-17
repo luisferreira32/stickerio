@@ -83,16 +83,16 @@ ORDER BY epoch, id
 }
 
 type dbCity struct {
-	id            string
-	name          string
-	playerID      string
-	locationX     int32
-	locationY     int32
-	mineLevel     int32
-	barracksLevel int32
-	resourceBase  string
-	resourceEpoch int64
-	unitCount     string
+	id                     string
+	name                   string
+	playerID               string
+	locationX              int32
+	locationY              int32
+	economicBuildingsLevel string
+	militaryBuildingsLevel string
+	resourceBase           string
+	resourceEpoch          int64
+	unitCount              string
 }
 
 func (r *StickerioRepository) GetCity(ctx context.Context, id, playerID string) (*dbCity, error) {
@@ -103,8 +103,8 @@ city_name,
 player_id,
 location_x,
 location_y,
-b_mine_level,
-b_barracks_level,
+b_economic_level,
+b_military_level,
 r_base,
 r_epoch,
 u_count
@@ -126,8 +126,8 @@ WHERE id=$1 AND player_id=$2
 			&result.playerID,
 			&result.locationX,
 			&result.locationY,
-			&result.mineLevel,
-			&result.barracksLevel,
+			&result.economicBuildingsLevel,
+			&result.militaryBuildingsLevel,
 			&result.resourceBase,
 			&result.resourceEpoch,
 			&result.unitCount,
@@ -268,8 +268,8 @@ city_name,
 player_id,
 location_x,
 location_y,
-b_mine_level,
-b_barracks_level,
+b_economic_level,
+b_military_level,
 r_base,
 r_epoch,
 u_count)
@@ -285,8 +285,8 @@ ON CONFLICT(id) REPLACE
 		c.playerID,
 		c.locationX,
 		c.locationY,
-		c.mineLevel,
-		c.barracksLevel,
+		c.economicBuildingsLevel,
+		c.militaryBuildingsLevel,
 		c.resourceBase,
 		c.resourceEpoch,
 		c.unitCount,
@@ -304,7 +304,7 @@ type dbMovement struct {
 	originID       string
 	destinationID  string
 	departureEpoch int64
-	speed          float32
+	speed          float64
 	resourceCount  string
 	unitCount      string
 }
@@ -465,8 +465,8 @@ type dbUnitQueueItem struct {
 	id          string
 	cityID      string
 	queuedEpoch int64
-	durationSec int32
-	unitCount   int32
+	durationSec int64
+	unitCount   int64
 	unitType    string
 }
 
@@ -591,7 +591,7 @@ type dbBuildingQueueItem struct {
 	id             string
 	cityID         string
 	queuedEpoch    int64
-	durationSec    int32
+	durationSec    int64
 	targetLevel    int32
 	targetBuilding string
 }
