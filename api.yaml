@@ -48,8 +48,8 @@ paths:
             schema:
               $ref: '#/components/schemas/v1CityInfo'
       responses:
-        '201':
-          description: Created
+        '202':
+          description: Accepted
   /v1/cities/{cityid}:
     get:
       summary: Get a city complete state.
@@ -66,6 +66,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1City'
+    delete:
+      summary: Delete a city.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Accepted
   /v1/cities/{cityid}/info:
     get:
       summary: Get a city info.
@@ -123,8 +134,8 @@ paths:
             schema:
               $ref: '#/components/schemas/v1UnitQueueItem'
       responses:
-        '201':
-          description: Created
+        '202':
+          description: Accepted
   /v1/cities/{cityid}/unitqitems/{itemid}:
     get:
       summary: Get a unit queue item.
@@ -187,8 +198,8 @@ paths:
             schema:
               $ref: '#/components/schemas/v1BuildingQueueItem'
       responses:
-        '201':
-          description: Created
+        '202':
+          description: Accepted
   /v1/cities/{cityid}/buildingqitems/{itemid}:
     get:
       summary: Get a building queue item.
@@ -265,8 +276,8 @@ paths:
             schema:
               $ref: '#/components/schemas/v1Movement'
       responses:
-        '201':
-          description: Created
+        '202':
+          description: Accepted
 
 components:
   schemas:

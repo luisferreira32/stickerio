@@ -46,6 +46,7 @@ func main() {
 			router.Route(fmt.Sprintf("/{%s}", internal.CityID), func(router chi.Router) {
 				router.Use(internal.WithCityIDContext)
 				router.Get("/", handlers.GetCity)
+				router.Get("/", handlers.DeleteCity)
 				router.Get("/info", handlers.GetCityInfo)
 				router.Route("/unitqitems", func(router chi.Router) {
 					router.Get("/", handlers.ListUnitQueueItem)

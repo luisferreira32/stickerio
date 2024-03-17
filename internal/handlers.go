@@ -356,8 +356,11 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 		resourceCount: m.ResourceCount,
 		unitCount:     m.UnitCount,
 	})
+	if err != nil {
+		errHandle(w, err.Error())
+	}
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
@@ -380,6 +383,7 @@ func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errHandle(w, err.Error())
 	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
@@ -402,6 +406,8 @@ func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errHandle(w, err.Error())
 	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (s *ServerHandler) CreateCity(w http.ResponseWriter, r *http.Request) {
@@ -421,6 +427,21 @@ func (s *ServerHandler) CreateCity(w http.ResponseWriter, r *http.Request) {
 		locationX: m.LocationX,
 		locationY: m.LocationY,
 	})
+	if err != nil {
+		errHandle(w, err.Error())
+	}
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *ServerHandler) DeleteCity(w http.ResponseWriter, r *http.Request) {
+	playerID := r.Context().Value(PlayerIDKey).(string)
+	cityID := r.Context().Value(CityIDKey).(string)
+
+	err := s.inserter.DeleteCity(r.Context(), playerID, cityID)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }

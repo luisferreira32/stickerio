@@ -21,6 +21,7 @@ const (
 	queueBuildingEventName   = "queuebuilding"
 	upgradeBuildingEventName = "upgradebuilding"
 	createCityEventName      = "createcity"
+	deleteCityEventName      = "deletecity"
 )
 
 var (
@@ -117,6 +118,14 @@ type createCityEvent struct {
 	UnitCount     tUnitCount     `json:"unitCount"`
 }
 
+// Inserted when a city is abandoned.
+// Its processing will effectively delete the city, vanquish the resources,
+// raze the buildings, and annihilate all units residing the city.
+type deleteCityEvent struct {
+	CityID   tCityID   `json:"cityID"`
+	PlayerID tPlayerID `json:"playerID"`
+}
+
 type eventsRepository interface {
 	InsertEvent(ctx context.Context, e *event) error
 	ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error)
@@ -127,7 +136,9 @@ type eventsRepository interface {
 	DeleteMovement(ctx context.Context, id string) error
 	DeleteCity(ctx context.Context, id string) error
 	DeleteUnitQueueItem(ctx context.Context, id string) error
+	DeleteUnitQueueItemsFromCity(ctx context.Context, cityID string) error
 	DeleteBuildingQueueItem(ctx context.Context, id string) error
+	DeleteBuildingQueueItemsFromCity(ctx context.Context, cityID string) error
 }
 
 type upsertIDs struct {
@@ -243,6 +254,8 @@ func (s *EventSourcer) processEvent(ctx context.Context, e *event) error {
 		err = s.processUpgradeBuildingEvent(ctx, e)
 	case createCityEventName:
 		err = s.processCreateCityEvent(ctx, e)
+	case deleteCityEventName:
+		err = s.processDeleteCityEvent(ctx, e)
 	}
 	if err != nil {
 		return err
@@ -289,6 +302,8 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 			err = s.processUpgradeBuildingEvent(ctx, e)
 		case createCityEventName:
 			err = s.processCreateCityEvent(ctx, e)
+		case deleteCityEventName:
+			err = s.processDeleteCityEvent(ctx, e)
 		default:
 			err = fmt.Errorf("%w, event %s, reason: %s %s", errPreConditionFailed, e.id, "unkown event name", e.name)
 		}
@@ -314,7 +329,15 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			// TODO: also delete all view tables queue items
+			err = s.repository.DeleteBuildingQueueItemsFromCity(ctx, string(cityID))
+			if err != nil {
+				return err
+			}
+			err = s.repository.DeleteUnitQueueItemsFromCity(ctx, string(cityID))
+			if err != nil {
+				return err
+			}
+			continue
 		}
 		dbc, err := cityToDBModel(c)
 		if err != nil {
@@ -332,6 +355,7 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			continue
 		}
 		dbm, err := movementToDBModel(m)
 		if err != nil {
@@ -350,6 +374,7 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
+				continue
 			}
 			dbitem := unitQueueItemToDBModel(item)
 			err := s.repository.UpsertUnitQueueItem(ctx, dbitem)
@@ -366,6 +391,7 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
+				continue
 			}
 			dbitem := buildingQueueItemToDBModel(item)
 			err := s.repository.UpsertBuildingQueueItem(ctx, dbitem)
@@ -688,7 +714,29 @@ func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error
 
 	// upsert cached table and signal future view table upsert
 	s.toUpsert.cities[tCityID(createCity.CityID)] = struct{}{}
+	return nil
+}
 
+func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error {
+	// parsing
+	deleteCity := deleteCityEvent{}
+	err := json.Unmarshal([]byte(e.payload), &deleteCity)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	if s.cityList[deleteCity.CityID].playerID != string(deleteCity.PlayerID) {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot delete cities of other players")
+	}
+	delete(s.cityList, deleteCity.CityID)
+	delete(s.buildingQueuesPerCity, deleteCity.CityID)
+	delete(s.unitQueuesPerCity, deleteCity.CityID)
+
+	// insert chain events
+
+	// upsert cached table and signal future view table upsert
+	s.toUpsert.cities[tCityID(deleteCity.CityID)] = struct{}{}
 	return nil
 }
 
