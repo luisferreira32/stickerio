@@ -388,7 +388,7 @@ func withDestinationCityID(cityID string) listMovementsFilterOpt {
 }
 
 func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*dbMovement, error) {
-	filtersQuery := "WHERE player_id=$1 AND id>$1"
+	filtersQuery := "WHERE player_id=$1 AND id>$2"
 	filtersValues := make([]interface{}, 0, len(filters))
 	filtersValues = append(filtersValues, playerID, lastID, pageSize)
 	for i, filter := range filters {
@@ -650,6 +650,24 @@ WHERE id=$1
 	return nil
 }
 
+func (r *StickerioRepository) DeleteUnitQueueItemsFromCity(ctx context.Context, cityID string) error {
+	const deleteUnitQueueItemQuery = `
+DELETE FROM unit_queue_view
+WHERE city_id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteUnitQueueItemQuery,
+		cityID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteUnitQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbBuildingQueueItem struct {
 	id             string
 	cityID         string
@@ -786,6 +804,24 @@ WHERE id=$1
 		ctx,
 		deleteBuildingQueueItemQuery,
 		buildingQueueItemID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteBuildingQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *StickerioRepository) DeleteBuildingQueueItemsFromCity(ctx context.Context, cityID string) error {
+	const deleteBuildingQueueItemQuery = `
+DELETE FROM building_queue_view
+WHERE city_id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteBuildingQueueItemQuery,
+		cityID,
 	)
 	if err != nil {
 		return fmt.Errorf("deleteBuildingQueueItemQuery failed: %w", err)
