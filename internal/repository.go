@@ -388,7 +388,7 @@ func withDestinationCityID(cityID string) listMovementsFilterOpt {
 }
 
 func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*dbMovement, error) {
-	filtersQuery := "WHERE player_id=$1 AND id>$1"
+	filtersQuery := "WHERE player_id=$1 AND id>$2"
 	filtersValues := make([]interface{}, 0, len(filters))
 	filtersValues = append(filtersValues, playerID, lastID, pageSize)
 	for i, filter := range filters {
