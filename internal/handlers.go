@@ -48,10 +48,8 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 			LocationX: city.locationX,
 			LocationY: city.locationY,
 		},
-		CityBuildings: api.V1CityBuildings{
-			BarracksLevel: city.barracksLevel,
-			MinesLevel:    city.mineLevel,
-		},
+		EconomicBuildings: city.economicBuildingsLevel,
+		MilitaryBuildings: city.militaryBuildingsLevel,
 		CityResources: api.V1CityResources{
 			Epoch:     city.resourceEpoch,
 			BaseCount: city.resourceBase,

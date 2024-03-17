@@ -23,8 +23,8 @@ var _ MappedNullable = &V1UnitQueueItem{}
 type V1UnitQueueItem struct {
 	Id string `json:"id"`
 	QueuedEpoch int64 `json:"queuedEpoch"`
-	DurationSec int32 `json:"durationSec"`
-	UnitCount int32 `json:"unitCount"`
+	DurationSec int64 `json:"durationSec"`
+	UnitCount int64 `json:"unitCount"`
 	UnitType string `json:"unitType"`
 }
 
@@ -34,7 +34,7 @@ type _V1UnitQueueItem V1UnitQueueItem
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1UnitQueueItem(id string, queuedEpoch int64, durationSec int32, unitCount int32, unitType string) *V1UnitQueueItem {
+func NewV1UnitQueueItem(id string, queuedEpoch int64, durationSec int64, unitCount int64, unitType string) *V1UnitQueueItem {
 	this := V1UnitQueueItem{}
 	this.Id = id
 	this.QueuedEpoch = queuedEpoch
@@ -101,9 +101,9 @@ func (o *V1UnitQueueItem) SetQueuedEpoch(v int64) {
 }
 
 // GetDurationSec returns the DurationSec field value
-func (o *V1UnitQueueItem) GetDurationSec() int32 {
+func (o *V1UnitQueueItem) GetDurationSec() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -112,7 +112,7 @@ func (o *V1UnitQueueItem) GetDurationSec() int32 {
 
 // GetDurationSecOk returns a tuple with the DurationSec field value
 // and a boolean to check if the value has been set.
-func (o *V1UnitQueueItem) GetDurationSecOk() (*int32, bool) {
+func (o *V1UnitQueueItem) GetDurationSecOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -120,14 +120,14 @@ func (o *V1UnitQueueItem) GetDurationSecOk() (*int32, bool) {
 }
 
 // SetDurationSec sets field value
-func (o *V1UnitQueueItem) SetDurationSec(v int32) {
+func (o *V1UnitQueueItem) SetDurationSec(v int64) {
 	o.DurationSec = v
 }
 
 // GetUnitCount returns the UnitCount field value
-func (o *V1UnitQueueItem) GetUnitCount() int32 {
+func (o *V1UnitQueueItem) GetUnitCount() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -136,7 +136,7 @@ func (o *V1UnitQueueItem) GetUnitCount() int32 {
 
 // GetUnitCountOk returns a tuple with the UnitCount field value
 // and a boolean to check if the value has been set.
-func (o *V1UnitQueueItem) GetUnitCountOk() (*int32, bool) {
+func (o *V1UnitQueueItem) GetUnitCountOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -144,7 +144,7 @@ func (o *V1UnitQueueItem) GetUnitCountOk() (*int32, bool) {
 }
 
 // SetUnitCount sets field value
-func (o *V1UnitQueueItem) SetUnitCount(v int32) {
+func (o *V1UnitQueueItem) SetUnitCount(v int64) {
 	o.UnitCount = v
 }
 

@@ -99,6 +99,12 @@ paths:
                   $ref: '#/components/schemas/v1UnitQueueItem'
     post:
       summary: Add a queue item.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -238,11 +244,13 @@ components:
   schemas:
     v1City:
       type: object
-      required: [cityInfo, cityBuildings, cityResources, unitCount]
+      required: [cityInfo, economicBuildings, militaryBuildings, cityResources, unitCount]
       properties:
         cityInfo:
           $ref: '#/components/schemas/v1CityInfo'
-        cityBuildings:
+        economicBuildings:
+          $ref: '#/components/schemas/v1CityBuildings'
+        militaryBuildings:
           $ref: '#/components/schemas/v1CityBuildings'
         cityResources:
           $ref: '#/components/schemas/v1CityResources'
@@ -264,12 +272,9 @@ components:
           type: integer
     v1CityBuildings:
       type: object
-      required: [barracksLevel, minesLevel]
-      properties:
-        barracksLevel:
-          type: integer
-        minesLevel:
-          type: integer
+      additionalProperties: 
+        type: integer
+        format: int64
     v1CityResources:
       type: object
       required: [epoch, baseCount]
@@ -300,8 +305,10 @@ components:
           format: int64
         durationSec:
           type: integer
+          format: int64
         unitCount:
           type: integer
+          format: int64
         unitType:
           type: string
     v1BuildingQueueItem:
@@ -315,6 +322,7 @@ components:
           format: int64
         durationSec:
           type: integer
+          format: int64
         level:
           type: integer
         building:
@@ -336,6 +344,7 @@ components:
           format: int64
         speed:
           type: number
+          format: double
         unitCount:
           $ref: '#/components/schemas/v1UnitCount'
         resourceCount:

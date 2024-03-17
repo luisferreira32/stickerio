@@ -22,7 +22,8 @@ var _ MappedNullable = &V1City{}
 // V1City struct for V1City
 type V1City struct {
 	CityInfo V1CityInfo `json:"cityInfo"`
-	CityBuildings V1CityBuildings `json:"cityBuildings"`
+	EconomicBuildings map[string]int64 `json:"economicBuildings"`
+	MilitaryBuildings map[string]int64 `json:"militaryBuildings"`
 	CityResources V1CityResources `json:"cityResources"`
 	UnitCount map[string]int64 `json:"unitCount"`
 }
@@ -33,10 +34,11 @@ type _V1City V1City
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1City(cityInfo V1CityInfo, cityBuildings V1CityBuildings, cityResources V1CityResources, unitCount map[string]int64) *V1City {
+func NewV1City(cityInfo V1CityInfo, economicBuildings map[string]int64, militaryBuildings map[string]int64, cityResources V1CityResources, unitCount map[string]int64) *V1City {
 	this := V1City{}
 	this.CityInfo = cityInfo
-	this.CityBuildings = cityBuildings
+	this.EconomicBuildings = economicBuildings
+	this.MilitaryBuildings = militaryBuildings
 	this.CityResources = cityResources
 	this.UnitCount = unitCount
 	return &this
@@ -74,28 +76,52 @@ func (o *V1City) SetCityInfo(v V1CityInfo) {
 	o.CityInfo = v
 }
 
-// GetCityBuildings returns the CityBuildings field value
-func (o *V1City) GetCityBuildings() V1CityBuildings {
+// GetEconomicBuildings returns the EconomicBuildings field value
+func (o *V1City) GetEconomicBuildings() map[string]int64 {
 	if o == nil {
-		var ret V1CityBuildings
+		var ret map[string]int64
 		return ret
 	}
 
-	return o.CityBuildings
+	return o.EconomicBuildings
 }
 
-// GetCityBuildingsOk returns a tuple with the CityBuildings field value
+// GetEconomicBuildingsOk returns a tuple with the EconomicBuildings field value
 // and a boolean to check if the value has been set.
-func (o *V1City) GetCityBuildingsOk() (*V1CityBuildings, bool) {
+func (o *V1City) GetEconomicBuildingsOk() (*map[string]int64, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.CityBuildings, true
+	return &o.EconomicBuildings, true
 }
 
-// SetCityBuildings sets field value
-func (o *V1City) SetCityBuildings(v V1CityBuildings) {
-	o.CityBuildings = v
+// SetEconomicBuildings sets field value
+func (o *V1City) SetEconomicBuildings(v map[string]int64) {
+	o.EconomicBuildings = v
+}
+
+// GetMilitaryBuildings returns the MilitaryBuildings field value
+func (o *V1City) GetMilitaryBuildings() map[string]int64 {
+	if o == nil {
+		var ret map[string]int64
+		return ret
+	}
+
+	return o.MilitaryBuildings
+}
+
+// GetMilitaryBuildingsOk returns a tuple with the MilitaryBuildings field value
+// and a boolean to check if the value has been set.
+func (o *V1City) GetMilitaryBuildingsOk() (*map[string]int64, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.MilitaryBuildings, true
+}
+
+// SetMilitaryBuildings sets field value
+func (o *V1City) SetMilitaryBuildings(v map[string]int64) {
+	o.MilitaryBuildings = v
 }
 
 // GetCityResources returns the CityResources field value
@@ -157,7 +183,8 @@ func (o V1City) MarshalJSON() ([]byte, error) {
 func (o V1City) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["cityInfo"] = o.CityInfo
-	toSerialize["cityBuildings"] = o.CityBuildings
+	toSerialize["economicBuildings"] = o.EconomicBuildings
+	toSerialize["militaryBuildings"] = o.MilitaryBuildings
 	toSerialize["cityResources"] = o.CityResources
 	toSerialize["unitCount"] = o.UnitCount
 	return toSerialize, nil
@@ -169,7 +196,8 @@ func (o *V1City) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"cityInfo",
-		"cityBuildings",
+		"economicBuildings",
+		"militaryBuildings",
 		"cityResources",
 		"unitCount",
 	}

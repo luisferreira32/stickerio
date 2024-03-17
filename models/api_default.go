@@ -674,6 +674,107 @@ func (a *DefaultAPIService) V1CitiesCityidUnitqitemsItemidGetExecute(r ApiV1Citi
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiV1CitiesCityidUnitqitemsPostRequest struct {
+	ctx context.Context
+	ApiService *DefaultAPIService
+	cityid string
+	v1UnitQueueItem *V1UnitQueueItem
+}
+
+func (r ApiV1CitiesCityidUnitqitemsPostRequest) V1UnitQueueItem(v1UnitQueueItem V1UnitQueueItem) ApiV1CitiesCityidUnitqitemsPostRequest {
+	r.v1UnitQueueItem = &v1UnitQueueItem
+	return r
+}
+
+func (r ApiV1CitiesCityidUnitqitemsPostRequest) Execute() (*http.Response, error) {
+	return r.ApiService.V1CitiesCityidUnitqitemsPostExecute(r)
+}
+
+/*
+V1CitiesCityidUnitqitemsPost Add a queue item.
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param cityid
+ @return ApiV1CitiesCityidUnitqitemsPostRequest
+*/
+func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPost(ctx context.Context, cityid string) ApiV1CitiesCityidUnitqitemsPostRequest {
+	return ApiV1CitiesCityidUnitqitemsPostRequest{
+		ApiService: a,
+		ctx: ctx,
+		cityid: cityid,
+	}
+}
+
+// Execute executes the request
+func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCityidUnitqitemsPostRequest) (*http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1CitiesCityidUnitqitemsPost")
+	if err != nil {
+		return nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/cities/{cityid}/unitqitems"
+	localVarPath = strings.Replace(localVarPath, "{"+"cityid"+"}", url.PathEscape(parameterValueToString(r.cityid, "cityid")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.v1UnitQueueItem == nil {
+		return nil, reportError("v1UnitQueueItem is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.v1UnitQueueItem
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		return localVarHTTPResponse, newErr
+	}
+
+	return localVarHTTPResponse, nil
+}
+
 type ApiV1CitiesGetRequest struct {
 	ctx context.Context
 	ApiService *DefaultAPIService

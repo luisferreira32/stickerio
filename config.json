@@ -24,6 +24,7 @@
     },
     "militaryBuildings": {
         "barracks": {
+            "maxLevel": 6,
             "multiplier": [
                 1.0,
                 0.9,
@@ -32,16 +33,43 @@
                 0.7,
                 0.68,
                 0.66
-            ]
-        },
-        "units": {
-            "stickmen": true,
-            "swordsmen": true,
-            "god": false
+            ],
+            "cost": [
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                }
+            ],
+            "units": {
+                "stickmen": true,
+                "swordsmen": true,
+                "god": false
+            }
         }
     },
     "economicBuildings": {
         "mines": {
+            "maxLevel": 6,
             "multiplier": [
                 1.0,
                 1.5,
@@ -50,11 +78,64 @@
                 4.0,
                 6.0,
                 10.0
-            ]
+            ],
+            "cost": [
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                },
+                {
+                    "sticks": 100,
+                    "circles": 100
+                }
+            ],
+            "resources": {
+                "sticks": true,
+                "circles": true
+            }
         },
-        "resources": {
-            "sticks": true,
-            "circles": true
+        "mason": {
+            "maxLevel": 3,
+            "multiplier": [
+                1.0,
+                2.5,
+                5.0,
+                12.5
+            ],
+            "cost": [
+                {
+                    "sticks": 200,
+                    "circles": 200
+                },
+                {
+                    "sticks": 200,
+                    "circles": 200
+                },
+                {
+                    "sticks": 200,
+                    "circles": 200
+                }
+            ],
+            "resources": {
+                "sticks": false,
+                "circles": true
+            }
         }
     },
     "resources": {
