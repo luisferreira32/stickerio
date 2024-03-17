@@ -403,3 +403,24 @@ func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 }
+
+func (s *ServerHandler) CreateCity(w http.ResponseWriter, r *http.Request) {
+	playerID := r.Context().Value(PlayerIDKey).(string)
+
+	decoder := json.NewDecoder(r.Body)
+	m := api.V1CityInfo{}
+	err := decoder.Decode(&m)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+
+	err = s.inserter.CreateCity(r.Context(), playerID, &city{
+		id:        m.Id,
+		name:      m.Name,
+		playerID:  playerID,
+		locationX: m.LocationX,
+		locationY: m.LocationY,
+	})
+
+	w.WriteHeader(http.StatusCreated)
+}
