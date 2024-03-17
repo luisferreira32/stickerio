@@ -293,6 +293,24 @@ ON CONFLICT(id) REPLACE
 	return nil
 }
 
+func (r *StickerioRepository) DeleteCity(ctx context.Context, cityID string) error {
+	const deleteCityQuery = `
+DELETE FROM city_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteCityQuery,
+		cityID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteCityQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbMovement struct {
 	id             string
 	playerID       string
@@ -470,6 +488,24 @@ ON CONFLICT(id) REPLACE
 	return nil
 }
 
+func (r *StickerioRepository) DeleteMovement(ctx context.Context, movementID string) error {
+	const deleteMovementQuery = `
+DELETE FROM movements_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteMovementQuery,
+		movementID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteMovementQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbUnitQueueItem struct {
 	id          string
 	cityID      string
@@ -596,6 +632,24 @@ ON CONFLICT(id) REPLACE
 	return nil
 }
 
+func (r *StickerioRepository) DeleteUnitQueueItem(ctx context.Context, unitQueueItemID string) error {
+	const deleteUnitQueueItemQuery = `
+DELETE FROM unit_queue_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteUnitQueueItemQuery,
+		unitQueueItemID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteUnitQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbBuildingQueueItem struct {
 	id             string
 	cityID         string
@@ -717,6 +771,24 @@ ON CONFLICT(id) REPLACE
 	)
 	if err != nil {
 		return fmt.Errorf("upsertBuildingQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *StickerioRepository) DeleteBuildingQueueItem(ctx context.Context, buildingQueueItemID string) error {
+	const deleteBuildingQueueItemQuery = `
+DELETE FROM building_queue_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteBuildingQueueItemQuery,
+		buildingQueueItemID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteBuildingQueueItemQuery failed: %w", err)
 	}
 
 	return nil

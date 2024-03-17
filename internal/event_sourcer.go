@@ -111,6 +111,10 @@ type eventsRepository interface {
 	UpsertCity(ctx context.Context, m *dbCity) error
 	UpsertUnitQueueItem(ctx context.Context, m *dbUnitQueueItem) error
 	UpsertBuildingQueueItem(ctx context.Context, m *dbBuildingQueueItem) error
+	DeleteMovement(ctx context.Context, id string) error
+	DeleteCity(ctx context.Context, id string) error
+	DeleteUnitQueueItem(ctx context.Context, id string) error
+	DeleteBuildingQueueItem(ctx context.Context, id string) error
 }
 
 type upsertIDs struct {
@@ -255,9 +259,16 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 }
 
 func (s *EventSourcer) upsertViews(ctx context.Context) error {
-	// TODO if the ID is not found it's a delete
 	for cityID := range s.toUpsert.cities {
-		dbc, err := cityToDBModel(s.cityList[cityID])
+		c, ok := s.cityList[cityID]
+		if !ok {
+			err := s.repository.DeleteCity(ctx, string(cityID))
+			if err != nil {
+				return err
+			}
+			// TODO: also delete all view tables queue items
+		}
+		dbc, err := cityToDBModel(c)
 		if err != nil {
 			return err
 		}
@@ -267,7 +278,14 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 		}
 	}
 	for movementID := range s.toUpsert.movements {
-		dbm, err := movementToDBModel(s.movementList[movementID])
+		m, ok := s.movementList[movementID]
+		if !ok {
+			err := s.repository.DeleteMovement(ctx, string(movementID))
+			if err != nil {
+				return err
+			}
+		}
+		dbm, err := movementToDBModel(m)
 		if err != nil {
 			return err
 		}
@@ -278,16 +296,30 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 	}
 	for cityID, unitQ := range s.toUpsert.unitQ {
 		for itemID := range unitQ {
-			dbitem := unitQueueItemToDBModel(s.unitQueuesPerCity[cityID][itemID])
+			item, ok := s.unitQueuesPerCity[cityID][itemID]
+			if !ok {
+				err := s.repository.DeleteUnitQueueItem(ctx, string(itemID))
+				if err != nil {
+					return err
+				}
+			}
+			dbitem := unitQueueItemToDBModel(item)
 			err := s.repository.UpsertUnitQueueItem(ctx, dbitem)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	for cityID, unitQ := range s.toUpsert.buildingQ {
-		for itemID := range unitQ {
-			dbitem := buildingQueueItemToDBModel(s.buildingQueuesPerCity[cityID][itemID])
+	for cityID, buildingQ := range s.toUpsert.buildingQ {
+		for itemID := range buildingQ {
+			item, ok := s.buildingQueuesPerCity[cityID][itemID]
+			if !ok {
+				err := s.repository.DeleteBuildingQueueItem(ctx, string(itemID))
+				if err != nil {
+					return err
+				}
+			}
+			dbitem := buildingQueueItemToDBModel(item)
 			err := s.repository.UpsertBuildingQueueItem(ctx, dbitem)
 			if err != nil {
 				return err
@@ -548,7 +580,7 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 	return nil
 }
 
-func (s *EventSourcer) processUpgradeBuildingEvent(ctx context.Context, e *event) error {
+func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) error {
 	// parsing
 	upgradeBuilding := upgradeBuildingEvent{}
 	err := json.Unmarshal([]byte(e.payload), &upgradeBuilding)
