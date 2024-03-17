@@ -22,17 +22,19 @@ type (
 )
 
 type militaryBuildingSpecs struct {
-	Multiplier  []float64          `json:"multiplier"`
-	UpgradeCost []tResourceCount   `json:"cost"`
-	MaxLevel    int                `json:"maxLevel"`
-	Units       map[tUnitName]bool `json:"units"`
+	Multiplier   []float64          `json:"multiplier"`
+	UpgradeCost  []tResourceCount   `json:"cost"`
+	UpgradeSpeed []int64            `json:"upgradeSpeed"`
+	MaxLevel     int                `json:"maxLevel"`
+	Units        map[tUnitName]bool `json:"units"`
 }
 
 type economicBuildingSpecs struct {
-	Multiplier  []float64              `json:"multiplier"`
-	UpgradeCost []tResourceCount       `json:"cost"`
-	MaxLevel    int                    `json:"maxLevel"`
-	Resources   map[tResourceName]bool `json:"resources"`
+	Multiplier   []float64              `json:"multiplier"`
+	UpgradeCost  []tResourceCount       `json:"cost"`
+	UpgradeSpeed []int64                `json:"upgradeSpeed"`
+	MaxLevel     int                    `json:"maxLevel"`
+	Resources    map[tResourceName]bool `json:"resources"`
 }
 
 type unitSpecs struct {
@@ -71,6 +73,7 @@ func init() {
 	// TODO: basic checks for consistency
 	// * levels / costs / multipliers match
 	// * costs are done with existing resources
+	// * check if buildings are not repeaed on military / economic
 
 	for n, v := range readOnlyConfig.EconomicBuildings {
 		if len(v.UpgradeCost) != len(v.Multiplier)-1 || len(v.UpgradeCost) != v.MaxLevel {

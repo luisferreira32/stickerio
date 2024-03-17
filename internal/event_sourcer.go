@@ -18,6 +18,7 @@ const (
 	arrivalMovementEventName = "arrival"
 	queueUnitEventName       = "queueunit"
 	createUnitEventName      = "createunit"
+	queueBuildingEventName   = "queuebuilding"
 )
 
 var (
@@ -78,6 +79,27 @@ type createUnitEvent struct {
 	PlayerID  tPlayerID `json:"playerID"`
 	UnitCount int64     `json:"unitCount"`
 	UnitType  tUnitName `json:"unitType"`
+}
+
+// Inserted when a request to queue a building upgrade is done.
+type queueBuildingEvent struct {
+	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
+	CityID              tCityID       `json:"cityID"`
+	PlayerID            tPlayerID     `json:"playerID"`
+	QueuedEpoch         tEpoch        `json:"queuedEpoch"`
+	TargetLevel         int32         `json:"targetLevel"`
+	TargetBuilding      tBuildingName `json:"targetBuilding"`
+}
+
+// Inserted when a queueBuildingEvent is processed.
+// If the cityID still belongs to the original player, the building is upgraded.
+// If the city was conquered by a different player, nothing will happen.
+type upgradeBuildingEvent struct {
+	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
+	CityID              tCityID       `json:"cityID"`
+	PlayerID            tPlayerID     `json:"playerID"`
+	TargetLevel         int32         `json:"targetLevel"`
+	TargetBuilding      tBuildingName `json:"targetBuilding"`
 }
 
 type eventsRepository interface {
@@ -454,6 +476,39 @@ func (s *EventSourcer) processCreateUnitEvent(_ context.Context, e *event) error
 
 	return nil
 }
+
+func (s *EventSourcer) processQueueBuildingEvent(_ context.Context, e *event) error {
+	// parsing
+	queueBuilding := queueBuildingEvent{}
+	err := json.Unmarshal([]byte(e.payload), &queueBuilding)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	// TODO: optimize this - military / economic split at what level?
+	var upgradeCost tResourceCount
+	militaryBuilding, isMilitary := readOnlyConfig.MilitaryBuildings[queueBuilding.TargetBuilding]
+	if isMilitary {
+		upgradeCost = militaryBuilding.UpgradeCost[s.cityList[queueBuilding.CityID].militaryBuildingsLevel[string(queueBuilding.TargetBuilding)]]
+	}
+	economicBuilding, isEconomic := readOnlyConfig.EconomicBuildings[queueBuilding.TargetBuilding]
+	if isEconomic {
+		upgradeCost = economicBuilding.UpgradeCost[s.cityList[queueBuilding.CityID].economicBuildingsLevel[string(queueBuilding.TargetBuilding)]]
+	}
+	err = recalculateResources(int64(queueBuilding.QueuedEpoch), upgradeCost, s.cityList[queueBuilding.CityID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+	}
+
+	// get upgrade duration
+	// set an upgrade building event at epoch + duration
+	// indicate a re-sync on the building queue items
+
+	return nil
+}
+
+func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, _ *event) error { return nil }
 
 func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 	missingResources := ""

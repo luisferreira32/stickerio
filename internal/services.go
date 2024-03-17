@@ -442,3 +442,35 @@ func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *
 	s.eventSourcer.queueEventHandling(e)
 	return nil
 }
+
+func (s *inserterService) QueueBuilding(ctx context.Context, playerID string, item *buildingQueueItem) error {
+	serverSideEpoch := time.Now().Unix()
+
+	queueItem := queueBuildingEvent{
+		BuildingQueueItemID: tItemID(item.id),
+		CityID:              tCityID(item.cityID),
+		PlayerID:            tPlayerID(playerID),
+		QueuedEpoch:         tEpoch(serverSideEpoch),
+		TargetLevel:         item.targetLevel,
+		TargetBuilding:      tBuildingName(item.targetBuilding),
+	}
+	payload, err := json.Marshal(queueItem)
+	if err != nil {
+		return err
+	}
+
+	eventID := uuid.NewString()
+	e := &event{
+		id:      eventID,
+		name:    queueBuildingEventName,
+		epoch:   serverSideEpoch,
+		payload: string(payload),
+	}
+
+	err = s.repository.InsertEvent(ctx, e)
+	if err != nil {
+		return err
+	}
+	s.eventSourcer.queueEventHandling(e)
+	return nil
+}

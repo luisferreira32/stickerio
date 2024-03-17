@@ -57,6 +57,7 @@ func main() {
 				})
 				router.Route("/buildingqitems", func(router chi.Router) {
 					router.Get("/", handlers.ListBuildingQueueItems)
+					router.Post("/", handlers.QueueBuilding)
 					router.Route(fmt.Sprintf("/{%s}", internal.ItemID), func(router chi.Router) {
 						router.Use(internal.WithBuildingQueueItemIDContext)
 						router.Get("/", handlers.GetBuildingQueueItem)

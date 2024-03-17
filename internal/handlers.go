@@ -338,6 +338,29 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 	}
 }
 
+func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
+	playerID := r.Context().Value(PlayerIDKey).(string)
+
+	decoder := json.NewDecoder(r.Body)
+	m := api.V1Movement{}
+	err := decoder.Decode(&m)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+
+	err = s.inserter.StartMovement(r.Context(), playerID, &movement{
+		id:            m.Id,
+		originID:      m.OriginID,
+		destinationID: m.DestinationID,
+		destinationX:  m.DestinationX,
+		destinationY:  m.DestinationY,
+		resourceCount: m.ResourceCount,
+		unitCount:     m.UnitCount,
+	})
+
+	w.WriteHeader(http.StatusCreated)
+}
+
 func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
 	playerID := r.Context().Value(PlayerIDKey).(string)
 	cityID := r.Context().Value(CityIDKey).(string)
@@ -360,25 +383,24 @@ func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
+func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
 	playerID := r.Context().Value(PlayerIDKey).(string)
+	cityID := r.Context().Value(CityIDKey).(string)
 
 	decoder := json.NewDecoder(r.Body)
-	m := api.V1Movement{}
-	err := decoder.Decode(&m)
+	item := api.V1BuildingQueueItem{}
+	err := decoder.Decode(&item)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
 
-	err = s.inserter.StartMovement(r.Context(), playerID, &movement{
-		id:            m.Id,
-		originID:      m.OriginID,
-		destinationID: m.DestinationID,
-		destinationX:  m.DestinationX,
-		destinationY:  m.DestinationY,
-		resourceCount: m.ResourceCount,
-		unitCount:     m.UnitCount,
+	err = s.inserter.QueueBuilding(r.Context(), playerID, &buildingQueueItem{
+		id:             item.Id,
+		cityID:         cityID,
+		targetLevel:    item.Level,
+		targetBuilding: item.Building,
 	})
-
-	w.WriteHeader(http.StatusCreated)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
 }

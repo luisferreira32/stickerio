@@ -161,6 +161,23 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/v1BuildingQueueItem'
+    post:
+      summary: Add a queue item.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/v1BuildingQueueItem'
+      responses:
+        '201':
+          description: Created
   /v1/cities/{cityid}/buildingqitems/{itemid}:
     get:
       summary: Get a building queue item.
