@@ -362,6 +362,12 @@ func withOriginCityID(cityID string) listMovementsFilterOpt {
 	}
 }
 
+func withDestinationCityID(cityID string) listMovementsFilterOpt {
+	return func() (string, interface{}) {
+		return "destination_id=", cityID
+	}
+}
+
 func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*dbMovement, error) {
 	filtersQuery := "WHERE player_id=$1 AND id>$1"
 	filtersValues := make([]interface{}, 0, len(filters))
@@ -369,7 +375,8 @@ func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastI
 	for i, filter := range filters {
 		q, v := filter()
 		filtersValues = append(filtersValues, v)
-		filtersQuery += " AND " + q + "$" + strconv.Itoa(i+4) // starts at $4 since $1 to $3 are already taken for lastID, playerID and pagination
+		// starts at $4 since $1 to $3 are already taken for lastID, playerID and pagination
+		filtersQuery += " AND " + q + "$" + strconv.Itoa(i+4)
 	}
 
 	listMovementQuery := fmt.Sprintf(`
@@ -550,6 +557,36 @@ LIMIT $3
 	return results, nil
 }
 
+func (r *StickerioRepository) UpsertUnitQueueItem(ctx context.Context, m *dbUnitQueueItem) error {
+	const upsertUnitQueueItemQuery = `
+INSERT INTO unit_queue_view(
+id,
+city_id,
+queued_epoch,
+duration_s,
+unit_count,
+unit_type)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT(id) REPLACE
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		upsertUnitQueueItemQuery,
+		m.id,
+		m.cityID,
+		m.queuedEpoch,
+		m.durationSec,
+		m.unitCount,
+		m.unitType,
+	)
+	if err != nil {
+		return fmt.Errorf("upsertUnitQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbBuildingQueueItem struct {
 	id             string
 	cityID         string
@@ -568,7 +605,7 @@ queued_epoch,
 duration_s,
 target_level,
 target_building
-FROM unit_queue_view
+FROM building_queue_view
 WHERE id=$1 AND city_id=$2
 `
 
@@ -610,7 +647,7 @@ queued_epoch,
 duration_s,
 target_level,
 target_building
-FROM unit_queue_view
+FROM building_queue_view
 WHERE city_id=$1 AND id>$2
 ORDER BY id
 LIMIT $3
@@ -644,4 +681,34 @@ LIMIT $3
 	}
 
 	return results, nil
+}
+
+func (r *StickerioRepository) UpsertBuildingQueueItem(ctx context.Context, m *dbBuildingQueueItem) error {
+	const upsertBuildingQueueItemQuery = `
+INSERT INTO building_queue_view(
+id,
+city_id,
+queued_epoch,
+duration_s,
+target_level,
+target_building)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT(id) REPLACE
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		upsertBuildingQueueItemQuery,
+		m.id,
+		m.cityID,
+		m.queuedEpoch,
+		m.durationSec,
+		m.targetLevel,
+		m.targetBuilding,
+	)
+	if err != nil {
+		return fmt.Errorf("upsertBuildingQueueItemQuery failed: %w", err)
+	}
+
+	return nil
 }

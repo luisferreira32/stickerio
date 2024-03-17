@@ -9,10 +9,6 @@ import (
 	api "github.com/luisferreira32/stickerio/models"
 )
 
-type eventSourcer interface {
-	queueEventHandling(e *event)
-}
-
 func errHandle(w http.ResponseWriter, fmtStr string, args ...any) {
 	http.Error(w, fmt.Sprintf(fmtStr, args...), http.StatusInternalServerError)
 	// TODO better error handling instead of panic :)
@@ -21,16 +17,14 @@ func errHandle(w http.ResponseWriter, fmtStr string, args ...any) {
 
 func NewServerHandler(repository *StickerioRepository, eventSourcer eventSourcer) *ServerHandler {
 	return &ServerHandler{
-		eventSourcer: eventSourcer,
-		viewer:       viewerService{repository: repository},
-		inserter:     inserterService{repository: repository},
+		viewer:   viewerService{repository: repository},
+		inserter: inserterService{repository: repository, eventSourcer: eventSourcer},
 	}
 }
 
 type ServerHandler struct {
-	eventSourcer eventSourcer
-	viewer       viewerService
-	inserter     inserterService
+	viewer   viewerService
+	inserter inserterService
 }
 
 func (s *ServerHandler) GetWelcome(w http.ResponseWriter, r *http.Request) {
@@ -178,8 +172,9 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 	originIDFilter := r.URL.Query().Get(OriginID.String())
+	destinationIDFilter := r.URL.Query().Get(DestinationID.String())
 
-	movements, err := s.viewer.ListMovements(r.Context(), playerID, lastID, pageSize, originIDFilter)
+	movements, err := s.viewer.ListMovements(r.Context(), playerID, lastID, pageSize, originIDFilter, destinationIDFilter)
 	if err != nil {
 		errHandle(w, err.Error())
 	}
@@ -341,6 +336,28 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 	}
 }
 
+func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
+	playerID := r.Context().Value(PlayerIDKey).(string)
+	cityID := r.Context().Value(CityIDKey).(string)
+
+	decoder := json.NewDecoder(r.Body)
+	item := api.V1UnitQueueItem{}
+	err := decoder.Decode(&item)
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+
+	err = s.inserter.QueueUnit(r.Context(), playerID, &unitQueueItem{
+		id:        item.Id,
+		cityID:    cityID,
+		unitCount: item.UnitCount,
+		unitType:  item.UnitType,
+	})
+	if err != nil {
+		errHandle(w, err.Error())
+	}
+}
+
 func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 	playerID := r.Context().Value(PlayerIDKey).(string)
 
@@ -351,9 +368,8 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 
-	err = s.inserter.StartMovement(r.Context(), &movement{
+	err = s.inserter.StartMovement(r.Context(), playerID, &movement{
 		id:            m.Id,
-		playerID:      playerID,
 		originID:      m.OriginID,
 		destinationID: m.DestinationID,
 		resourceCount: m.ResourceCount,

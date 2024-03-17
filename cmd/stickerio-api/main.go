@@ -24,7 +24,7 @@ func main() {
 
 	database := internal.NewStickerioRepository(os.Getenv("DB_HOST"))
 	eventSourcer := internal.NewEventSourcer(database)
-	eventSourcer.StartEventsWorker(ctx, 5*time.Minute)
+	eventSourcer.StartEventsWorker(ctx, 10*time.Second)
 	handlers := internal.NewServerHandler(database, eventSourcer)
 
 	router := chi.NewRouter()
@@ -49,12 +49,13 @@ func main() {
 				router.Get("/info", handlers.GetCityInfo)
 				router.Route("/unitqitems", func(router chi.Router) {
 					router.Get("/", handlers.ListUnitQueueItem)
+					router.Post("/", handlers.QueueUnit)
 					router.Route(fmt.Sprintf("/{%s}", internal.ItemID), func(router chi.Router) {
 						router.Use(internal.WithUnitQueueItemIDContext)
 						router.Get("/", handlers.GetUnitQueueItem)
 					})
 				})
-				router.Route("/buildingq", func(router chi.Router) {
+				router.Route("/buildingqitems", func(router chi.Router) {
 					router.Get("/", handlers.ListBuildingQueueItems)
 					router.Route(fmt.Sprintf("/{%s}", internal.ItemID), func(router chi.Router) {
 						router.Use(internal.WithBuildingQueueItemIDContext)
