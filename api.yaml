@@ -329,7 +329,7 @@ components:
           type: string
     v1Movement:
       type: object
-      required: [id, playerID, originID, destinationID, departureEpoch, speed, unitCount, resourceCount]
+      required: [id, playerID, originID, destinationID, destinationX, destinationY, departureEpoch, speed, unitCount, resourceCount]
       properties:
         id:
           type: string
@@ -339,6 +339,10 @@ components:
           type: string
         destinationID:
           type: string
+        destinationX:
+          type: integer
+        destinationY:
+          type: integer
         departureEpoch:
           type: integer
           format: int64

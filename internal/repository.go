@@ -303,6 +303,8 @@ type dbMovement struct {
 	playerID       string
 	originID       string
 	destinationID  string
+	destinationX   int32
+	destinationY   int32
 	departureEpoch int64
 	speed          float64
 	resourceCount  string
@@ -316,6 +318,8 @@ id,
 player_id,
 origin_id,
 destination_id,
+destination_x,
+destination_y,
 departure_epoch,
 speed,
 r_count,
@@ -337,6 +341,8 @@ WHERE id=$1 AND player_id=$2
 			&result.playerID,
 			&result.originID,
 			&result.destinationID,
+			&result.destinationX,
+			&result.destinationY,
 			&result.departureEpoch,
 			&result.speed,
 			&result.resourceCount,
@@ -385,6 +391,8 @@ id,
 player_id,
 origin_id,
 destination_id,
+destination_x,
+destination_y,
 departure_epoch,
 speed,
 r_count,
@@ -409,6 +417,8 @@ LIMIT $3
 			&result.playerID,
 			&result.originID,
 			&result.destinationID,
+			&result.destinationX,
+			&result.destinationY,
 			&result.departureEpoch,
 			&result.speed,
 			&result.resourceCount,
@@ -434,11 +444,13 @@ id,
 player_id,
 origin_id,
 destination_id,
+destination_x,
+destination_y,
 departure_epoch,
 speed,
 r_count,
 u_count)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT(id) REPLACE
 `
 
@@ -449,6 +461,8 @@ ON CONFLICT(id) REPLACE
 		m.playerID,
 		m.originID,
 		m.destinationID,
+		m.destinationX,
+		m.destinationY,
 		m.departureEpoch,
 		m.speed,
 		m.resourceCount,
