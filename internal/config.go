@@ -18,6 +18,7 @@ type (
 	tUnitName        string
 	tResourceTrickle int64
 	tResourceName    string
+	tUnitStats       map[string]int64
 )
 
 // NOTE: we take advantage of golang's defaults to false for units/resources
@@ -36,6 +37,7 @@ type unitSpecs struct {
 	UnitSpeed              float64        `json:"speed"`
 	UnitProductionSpeedSec int64          `json:"productionSpeed"`
 	UnitCost               tResourceCount `json:"cost"`
+	Stats                  tUnitStats     `json:"stats"`
 }
 
 type gameConfig struct {

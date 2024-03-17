@@ -16,6 +16,7 @@ import (
 const (
 	startMovementEventName   = "startmovement"
 	arrivalMovementEventName = "arrival"
+	returnMovementEventName  = "returnmovement"
 	queueUnitEventName       = "queueunit"
 	createUnitEventName      = "createunit"
 	queueBuildingEventName   = "queuebuilding"
@@ -48,11 +49,25 @@ type startMovementEvent struct {
 // Inserted when a startMovementEvent is processed.
 // The arrival processing does the options:
 // * reinforce if it's from the same player;
-// * battle if it's from separate player
-// * forage if it's abandoned
-// * create a new city if the unit type sent has the capability for settling
-// Then, based on survival (if any), if the current city is not owned by the player (i.e., it was not a reinforce), re-calculate a startMovement event and schedule it.
+// * battle if it's from separate player and insert returnMovementEvent if troops survive;
+// * forage if it's abandoned and insert returnMovementEvent;
+// * create a new city if the unit type sent has the capability for settling;
 type arrivalMovementEvent struct {
+	MovementID    tMovementID    `json:"movementID"`
+	PlayerID      tPlayerID      `json:"playerID"`
+	OriginID      tCityID        `json:"originID"`
+	DestinationID tCityID        `json:"destinationID"`
+	DestinationX  int32          `json:"destinationX"`
+	DestinationY  int32          `json:"destinationY"`
+	UnitCount     tUnitCount     `json:"unitCount"`
+	ResourceCount tResourceCount `json:"resourceCount"`
+}
+
+// Inserted when a startMovementEvent is processed.
+// Processing will simply reinforce the city where they return to with units/resources.
+// If the units return to a city that was conquered - since they would not really expect
+// that, they are unfortunately massacred and everything is forever lost.
+type returnMovementEvent struct {
 	MovementID    tMovementID    `json:"movementID"`
 	PlayerID      tPlayerID      `json:"playerID"`
 	OriginID      tCityID        `json:"originID"`
@@ -241,6 +256,8 @@ func (s *EventSourcer) processEvent(ctx context.Context, e *event) error {
 		err = s.processStartMovementEvent(ctx, e)
 	case arrivalMovementEventName:
 		err = s.processArrivalMovementEvent(ctx, e)
+	case returnMovementEventName:
+		err = s.processReturnMovementEvent(ctx, e)
 	case queueUnitEventName:
 		err = s.processQueueUnitEventName(ctx, e)
 	case createUnitEventName:
@@ -286,6 +303,8 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 			err = s.processStartMovementEvent(ctx, e)
 		case arrivalMovementEventName:
 			err = s.processArrivalMovementEvent(ctx, e)
+		case returnMovementEventName:
+			err = s.processReturnMovementEvent(ctx, e)
 		case queueUnitEventName:
 			err = s.processQueueUnitEventName(ctx, e)
 		case createUnitEventName:
@@ -418,11 +437,11 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	if startMovement.OriginID == startMovement.DestinationID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot move to the same city")
 	}
-	err = recalculateResources(int64(startMovement.DepartureEpoch), startMovement.ResourceCount, s.inMemoryState.cityList[startMovement.OriginID])
+	err = reCalculateResources(int64(startMovement.DepartureEpoch), startMovement.ResourceCount, s.inMemoryState.cityList[startMovement.OriginID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
-	err = recalculateUnits(startMovement.UnitCount, s.inMemoryState.cityList[startMovement.OriginID])
+	err = reCalculateUnits(startMovement.UnitCount, s.inMemoryState.cityList[startMovement.OriginID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -481,7 +500,7 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	return nil
 }
 
-func (s *EventSourcer) processArrivalMovementEvent(_ context.Context, e *event) error {
+func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event) error {
 	// parsing
 	arrivalMovement := arrivalMovementEvent{}
 	err := json.Unmarshal([]byte(e.payload), &arrivalMovement)
@@ -490,29 +509,147 @@ func (s *EventSourcer) processArrivalMovementEvent(_ context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	switch {
-	case arrivalMovement.DestinationID == "":
-		// TODO:
-		// might be have been an empty spot when the movement started
-		// check if location X,Y were colonized or not
-		// if not - forage random value of resources and go back to originID
-	case arrivalMovement.PlayerID == tPlayerID(s.inMemoryState.cityList[arrivalMovement.DestinationID].playerID):
-		// TODO:
-		// we've arrived at a friendly city: reinforce the units and top-up resource bases
-	case arrivalMovement.PlayerID != tPlayerID(s.inMemoryState.cityList[arrivalMovement.DestinationID].playerID):
-		// TODO:
-		// calculate battle. if units survive, calculate plunder and chain a return movement event
-		// if units all die, don't chain another event, just subtract units from the destination ID
-		// TODO: future aliances possibility and treat this as a permanent reinforcement (?)
-		// NOTE: it cannot be a startMovementEvent since we need to acertain that the startMovementEvent
-		// was generated by the player that owns the originID - which is not plausible in returning
-		// units - neither we want to subtract units to the destinationID when we're coming back.
+	destinationID := arrivalMovement.DestinationID
+	if c := s.inMemoryState.getCityByLocation(arrivalMovement.DestinationX, arrivalMovement.DestinationY); c != nil {
+		destinationID = tCityID(c.id)
 	}
 
-	// insert chain events
-	// upsert cached table and signal future view table upsert
+	switch {
+	case destinationID == "":
+		calculateForaging(arrivalMovement.UnitCount, arrivalMovement.ResourceCount)
+		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
 
-	// TODO: remove previous movement event
+		speed := getMovementSpeed(arrivalMovement.UnitCount)
+		distance := dist(
+			arrivalMovement.DestinationY,
+			arrivalMovement.DestinationY,
+			originCity.locationX,
+			originCity.locationY,
+		)
+		travelDurationSec := int64(distance / speed)
+
+		s.inMemoryState.movementList[arrivalMovement.MovementID].originID = string(destinationID)
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationID = string(arrivalMovement.OriginID)
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationX = originCity.locationX
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationY = originCity.locationY
+		s.inMemoryState.movementList[arrivalMovement.MovementID].resourceCount = arrivalMovement.ResourceCount
+
+		// insert chain events
+		returnMovement := &returnMovementEvent{
+			MovementID: arrivalMovement.MovementID,
+			PlayerID:   arrivalMovement.PlayerID,
+			// switch origin and destination
+			OriginID:      arrivalMovement.DestinationID,
+			DestinationID: arrivalMovement.OriginID,
+			DestinationX:  originCity.locationX,
+			DestinationY:  originCity.locationY,
+			UnitCount:     arrivalMovement.UnitCount,
+			ResourceCount: arrivalMovement.ResourceCount,
+		}
+		payload, err := json.Marshal(returnMovement)
+		if err != nil {
+			return err
+		}
+		chainEvent := &event{
+			id:      uuid.NewString(),
+			name:    returnMovementEventName,
+			epoch:   e.epoch + travelDurationSec,
+			payload: string(payload),
+		}
+		err = s.repository.InsertEvent(ctx, chainEvent)
+		if err != nil {
+			return err
+		}
+
+	case arrivalMovement.PlayerID == tPlayerID(s.inMemoryState.cityList[destinationID].playerID):
+		for resourceName, resourceTransported := range arrivalMovement.ResourceCount {
+			s.inMemoryState.cityList[destinationID].resourceBase[resourceName] += resourceTransported
+		}
+		for unitName, reinforcementCount := range arrivalMovement.UnitCount {
+			s.inMemoryState.cityList[destinationID].unitCount[unitName] += reinforcementCount
+		}
+		// upsert cached table and signal future view table upsert
+		delete(s.inMemoryState.movementList, arrivalMovement.MovementID)
+		s.toUpsert.cities[destinationID] = struct{}{}
+
+	case arrivalMovement.PlayerID != tPlayerID(s.inMemoryState.cityList[destinationID].playerID):
+		// TODO: future aliances possibility and treat this as a permanent reinforcement instead of an attack (?)
+		calculateBattle(arrivalMovement.UnitCount, s.inMemoryState.cityList[destinationID].unitCount)
+		attackersSurvived := false
+		for _, survived := range arrivalMovement.UnitCount {
+			if survived == 0 {
+				continue
+			}
+			attackersSurvived = true
+		}
+
+		s.toUpsert.cities[destinationID] = struct{}{} // upsert attacked city regardless
+		if !attackersSurvived {
+			return nil
+		}
+
+		calculatePlunder(
+			arrivalMovement.UnitCount,
+			s.inMemoryState.cityList[destinationID].unitCount,
+			arrivalMovement.ResourceCount,
+			nil, // TODO: calculate plunder and re-calc the city view for the one who was attacked
+		)
+
+		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
+		speed := getMovementSpeed(arrivalMovement.UnitCount)
+		distance := dist(
+			arrivalMovement.DestinationY,
+			arrivalMovement.DestinationY,
+			originCity.locationX,
+			originCity.locationY,
+		)
+		travelDurationSec := int64(distance / speed)
+
+		s.inMemoryState.movementList[arrivalMovement.MovementID].originID = string(destinationID)
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationID = string(arrivalMovement.OriginID)
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationX = originCity.locationX
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationY = originCity.locationY
+		s.inMemoryState.movementList[arrivalMovement.MovementID].resourceCount = arrivalMovement.ResourceCount
+		s.inMemoryState.movementList[arrivalMovement.MovementID].unitCount = arrivalMovement.UnitCount
+		s.inMemoryState.movementList[arrivalMovement.MovementID].speed = speed
+
+		// insert chain events
+		returnMovement := &returnMovementEvent{
+			MovementID: arrivalMovement.MovementID,
+			PlayerID:   arrivalMovement.PlayerID,
+			// switch origin and destination
+			OriginID:      arrivalMovement.DestinationID,
+			DestinationID: arrivalMovement.OriginID,
+			DestinationX:  originCity.locationX,
+			DestinationY:  originCity.locationY,
+			UnitCount:     arrivalMovement.UnitCount,
+			ResourceCount: arrivalMovement.ResourceCount,
+		}
+		payload, err := json.Marshal(returnMovement)
+		if err != nil {
+			return err
+		}
+		chainEvent := &event{
+			id:      uuid.NewString(),
+			name:    returnMovementEventName,
+			epoch:   e.epoch + travelDurationSec,
+			payload: string(payload),
+		}
+		err = s.repository.InsertEvent(ctx, chainEvent)
+		if err != nil {
+			return err
+		}
+	}
+
+	// no matter if it is deleted or it's a returning movement, the movement will
+	// be updated (e.g., switch destinations)
+	s.toUpsert.movements[arrivalMovement.MovementID] = struct{}{}
+
+	return nil
+}
+
+func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event) error {
+	// TODO
 	return nil
 }
 
@@ -528,7 +665,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	if s.inMemoryState.cityList[queueUnit.CityID].playerID != string(queueUnit.PlayerID) {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
-	err = recalculateResources(e.epoch, readOnlyConfig.Units[queueUnit.UnitType].UnitCost, s.inMemoryState.cityList[queueUnit.CityID])
+	err = reCalculateResources(e.epoch, readOnlyConfig.Units[queueUnit.UnitType].UnitCost, s.inMemoryState.cityList[queueUnit.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -616,7 +753,7 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "only upgrade 1 level at a time")
 	}
 	upgradeCost := targetBuildingSpecs.UpgradeCost[currentBuildingLevel]
-	err = recalculateResources(e.epoch, upgradeCost, s.inMemoryState.cityList[queueBuilding.CityID])
+	err = reCalculateResources(e.epoch, upgradeCost, s.inMemoryState.cityList[queueBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -673,7 +810,7 @@ func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) 
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
 	// HACK: pass a zero cost event to re-calculate the base and increment the epoch
-	err = recalculateResources(int64(e.epoch), make(tResourceCount), s.inMemoryState.cityList[upgradeBuilding.CityID])
+	err = reCalculateResources(int64(e.epoch), make(tResourceCount), s.inMemoryState.cityList[upgradeBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -749,7 +886,7 @@ func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error
 	return nil
 }
 
-func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
+func reCalculateResources(epoch int64, cost tResourceCount, c *city) error {
 	missingResources := ""
 	for resourceName, resourceCost := range cost {
 		if c.resourceBase[resourceName] > resourceCost {
@@ -788,7 +925,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 	return nil
 }
 
-func recalculateUnits(cost tUnitCount, c *city) error {
+func reCalculateUnits(cost tUnitCount, c *city) error {
 	insufficientUnits := ""
 	for unitName, unitCount := range cost {
 		if c.unitCount[unitName] > unitCount {
@@ -833,3 +970,9 @@ func dist(x1, y1, x2, y2 int32) float64 {
 	}
 	return math.Sqrt(float64(squareDist))
 }
+
+func calculateForaging(units tUnitCount, initialLoad tResourceCount) {} // TODO
+
+func calculateBattle(attackers, defenders tUnitCount) {} // TODO
+
+func calculatePlunder(attackers, defenders tUnitCount, initialLoad, cityResources tResourceCount) {} // TODO

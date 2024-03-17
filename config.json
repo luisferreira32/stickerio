@@ -7,6 +7,10 @@
             "cost": {
                 "sticks": 10,
                 "circles": 1
+            },
+            "stats": {
+                "pierce": 10,
+                "slash": 10
             }
         },
         "swordsmen": {
@@ -15,6 +19,10 @@
             "cost": {
                 "sticks": 15,
                 "circles": 5
+            },
+            "stats": {
+                "pierce": 15,
+                "slash": 5
             }
         },
         "god": {
