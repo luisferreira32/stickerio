@@ -261,13 +261,11 @@ components:
   schemas:
     v1City:
       type: object
-      required: [cityInfo, economicBuildings, militaryBuildings, cityResources, unitCount]
+      required: [cityInfo, buildings, cityResources, unitCount]
       properties:
         cityInfo:
           $ref: '#/components/schemas/v1CityInfo'
-        economicBuildings:
-          $ref: '#/components/schemas/v1CityBuildings'
-        militaryBuildings:
+        buildings:
           $ref: '#/components/schemas/v1CityBuildings'
         cityResources:
           $ref: '#/components/schemas/v1CityResources'

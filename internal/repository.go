@@ -83,16 +83,15 @@ ORDER BY epoch, id
 }
 
 type dbCity struct {
-	id                     string
-	name                   string
-	playerID               string
-	locationX              int32
-	locationY              int32
-	economicBuildingsLevel string
-	militaryBuildingsLevel string
-	resourceBase           string
-	resourceEpoch          int64
-	unitCount              string
+	id             string
+	name           string
+	playerID       string
+	locationX      int32
+	locationY      int32
+	buildingsLevel string
+	resourceBase   string
+	resourceEpoch  int64
+	unitCount      string
 }
 
 func (r *StickerioRepository) GetCity(ctx context.Context, id, playerID string) (*dbCity, error) {
@@ -103,8 +102,7 @@ city_name,
 player_id,
 location_x,
 location_y,
-b_economic_level,
-b_military_level,
+b_level,
 r_base,
 r_epoch,
 u_count
@@ -126,8 +124,7 @@ WHERE id=$1 AND player_id=$2
 			&result.playerID,
 			&result.locationX,
 			&result.locationY,
-			&result.economicBuildingsLevel,
-			&result.militaryBuildingsLevel,
+			&result.buildingsLevel,
 			&result.resourceBase,
 			&result.resourceEpoch,
 			&result.unitCount,
@@ -268,12 +265,11 @@ city_name,
 player_id,
 location_x,
 location_y,
-b_economic_level,
-b_military_level,
+b_level,
 r_base,
 r_epoch,
 u_count)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT(id) REPLACE
 `
 
@@ -285,8 +281,7 @@ ON CONFLICT(id) REPLACE
 		c.playerID,
 		c.locationX,
 		c.locationY,
-		c.economicBuildingsLevel,
-		c.militaryBuildingsLevel,
+		c.buildingsLevel,
 		c.resourceBase,
 		c.resourceEpoch,
 		c.unitCount,

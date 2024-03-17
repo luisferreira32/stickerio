@@ -486,16 +486,7 @@ func (s *EventSourcer) processQueueBuildingEvent(_ context.Context, e *event) er
 	}
 
 	// validation and event calculations
-	// TODO: optimize this - military / economic split at what level?
-	var upgradeCost tResourceCount
-	militaryBuilding, isMilitary := readOnlyConfig.MilitaryBuildings[queueBuilding.TargetBuilding]
-	if isMilitary {
-		upgradeCost = militaryBuilding.UpgradeCost[s.cityList[queueBuilding.CityID].militaryBuildingsLevel[string(queueBuilding.TargetBuilding)]]
-	}
-	economicBuilding, isEconomic := readOnlyConfig.EconomicBuildings[queueBuilding.TargetBuilding]
-	if isEconomic {
-		upgradeCost = economicBuilding.UpgradeCost[s.cityList[queueBuilding.CityID].economicBuildingsLevel[string(queueBuilding.TargetBuilding)]]
-	}
+	upgradeCost := readOnlyConfig.Buildings[queueBuilding.TargetBuilding].UpgradeCost[s.cityList[queueBuilding.CityID].buildingsLevel[string(queueBuilding.TargetBuilding)]]
 	err = recalculateResources(int64(queueBuilding.QueuedEpoch), upgradeCost, s.cityList[queueBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
@@ -520,7 +511,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		multiplier := 1.0
 		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
-			multiplier *= readOnlyConfig.EconomicBuildings[buildingKey].Multiplier[c.economicBuildingsLevel[string(buildingKey)]]
+			multiplier *= readOnlyConfig.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[string(buildingKey)]]
 		}
 		currentResources := int64(float64(c.resourceBase[resourceName]) +
 			float64(epoch-c.resourceEpoch)*
@@ -539,7 +530,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		multiplier := 1.0
 		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
-			multiplier *= readOnlyConfig.EconomicBuildings[buildingKey].Multiplier[c.economicBuildingsLevel[string(buildingKey)]]
+			multiplier *= readOnlyConfig.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[string(buildingKey)]]
 		}
 		currentResources := int64(float64(c.resourceBase[resourceName]) +
 			float64(epoch-c.resourceEpoch)*
@@ -581,7 +572,7 @@ func getTrainingDuration(unitCount int64, unitName tUnitName, c *city) int64 {
 	multiplier := 1.0
 	for _, buildingKey := range readOnlyTrainingMultipliers[unitName] {
 		// TODO: formalize these equations to calculate game time
-		multiplier *= readOnlyConfig.MilitaryBuildings[buildingKey].Multiplier[c.militaryBuildingsLevel[string(buildingKey)]]
+		multiplier *= readOnlyConfig.Buildings[buildingKey].TrainingMultiplier[c.buildingsLevel[string(buildingKey)]]
 	}
 	return int64(float64(readOnlyConfig.Units[unitName].UnitProductionSpeedSec*unitCount) * multiplier)
 }

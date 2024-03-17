@@ -25,16 +25,15 @@ type viewerService struct {
 }
 
 type city struct {
-	id                     string
-	name                   string
-	playerID               string
-	locationX              int32
-	locationY              int32
-	economicBuildingsLevel map[string]int64
-	militaryBuildingsLevel map[string]int64
-	resourceBase           map[string]int64
-	resourceEpoch          int64
-	unitCount              map[string]int64
+	id             string
+	name           string
+	playerID       string
+	locationX      int32
+	locationY      int32
+	buildingsLevel map[string]int64
+	resourceBase   map[string]int64
+	resourceEpoch  int64
+	unitCount      map[string]int64
 }
 
 func cityFromDBModel(dbCity *dbCity) (*city, error) {
@@ -48,27 +47,21 @@ func cityFromDBModel(dbCity *dbCity) (*city, error) {
 	if err != nil {
 		return nil, err
 	}
-	economicBuildingsLevel := make(map[string]int64)
-	err = json.Unmarshal([]byte(dbCity.economicBuildingsLevel), &economicBuildingsLevel)
-	if err != nil {
-		return nil, err
-	}
-	militaryBuildingsLevel := make(map[string]int64)
-	err = json.Unmarshal([]byte(dbCity.militaryBuildingsLevel), &militaryBuildingsLevel)
+	buildingsLevel := make(map[string]int64)
+	err = json.Unmarshal([]byte(dbCity.buildingsLevel), &buildingsLevel)
 	if err != nil {
 		return nil, err
 	}
 	return &city{
-		id:                     dbCity.id,
-		name:                   dbCity.name,
-		playerID:               dbCity.playerID,
-		locationX:              dbCity.locationX,
-		locationY:              dbCity.locationY,
-		economicBuildingsLevel: economicBuildingsLevel,
-		militaryBuildingsLevel: militaryBuildingsLevel,
-		resourceBase:           resourceBase,
-		resourceEpoch:          dbCity.resourceEpoch,
-		unitCount:              unitCount,
+		id:             dbCity.id,
+		name:           dbCity.name,
+		playerID:       dbCity.playerID,
+		locationX:      dbCity.locationX,
+		locationY:      dbCity.locationY,
+		buildingsLevel: buildingsLevel,
+		resourceBase:   resourceBase,
+		resourceEpoch:  dbCity.resourceEpoch,
+		unitCount:      unitCount,
 	}, nil
 }
 
@@ -81,25 +74,20 @@ func cityToDBModel(c *city) (*dbCity, error) {
 	if err != nil {
 		return nil, err
 	}
-	economicBuildingsLevel, err := json.Marshal(c.economicBuildingsLevel)
-	if err != nil {
-		return nil, err
-	}
-	militaryBuildingsLevel, err := json.Marshal(c.militaryBuildingsLevel)
+	buildingsLevel, err := json.Marshal(c.buildingsLevel)
 	if err != nil {
 		return nil, err
 	}
 	return &dbCity{
-		id:                     c.id,
-		name:                   c.name,
-		playerID:               c.playerID,
-		locationX:              c.locationX,
-		locationY:              c.locationY,
-		economicBuildingsLevel: string(economicBuildingsLevel),
-		militaryBuildingsLevel: string(militaryBuildingsLevel),
-		resourceBase:           string(resourceBase),
-		resourceEpoch:          c.resourceEpoch,
-		unitCount:              string(unitCount),
+		id:             c.id,
+		name:           c.name,
+		playerID:       c.playerID,
+		locationX:      c.locationX,
+		locationY:      c.locationY,
+		buildingsLevel: string(buildingsLevel),
+		resourceBase:   string(resourceBase),
+		resourceEpoch:  c.resourceEpoch,
+		unitCount:      string(unitCount),
 	}, nil
 }
 
