@@ -2,7 +2,6 @@ package internal
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"sort"
 )
@@ -21,18 +20,16 @@ type (
 	tResourceName    string
 )
 
-type militaryBuildingSpecs struct {
-	Multiplier  []float64          `json:"multiplier"`
-	UpgradeCost []tResourceCount   `json:"cost"`
-	MaxLevel    int                `json:"maxLevel"`
-	Units       map[tUnitName]bool `json:"units"`
-}
-
-type economicBuildingSpecs struct {
-	Multiplier  []float64              `json:"multiplier"`
-	UpgradeCost []tResourceCount       `json:"cost"`
-	MaxLevel    int                    `json:"maxLevel"`
-	Resources   map[tResourceName]bool `json:"resources"`
+// NOTE: we take advantage of golang's defaults to false for units/resources
+// since a "get" in a map that does not have the keys is false
+type buildingSpecs struct {
+	ResourceMultiplier []float64              `json:"resourceMultiplier"`
+	TrainingMultiplier []float64              `json:"trainingMultiplier"`
+	UpgradeCost        []tResourceCount       `json:"cost"`
+	UpgradeSpeed       []int64                `json:"upgradeSpeed"`
+	MaxLevel           int                    `json:"maxLevel"`
+	Units              map[tUnitName]bool     `json:"units"`
+	Resources          map[tResourceName]bool `json:"resources"`
 }
 
 type unitSpecs struct {
@@ -42,10 +39,9 @@ type unitSpecs struct {
 }
 
 type gameConfig struct {
-	MilitaryBuildings map[tBuildingName]militaryBuildingSpecs `json:"militaryBuildings"`
-	EconomicBuildings map[tBuildingName]economicBuildingSpecs `json:"economicBuildings"`
-	Units             map[tUnitName]unitSpecs                 `json:"units"`
-	ResourceTrickles  map[tResourceName]tResourceTrickle      `json:"resources"`
+	Buildings        map[tBuildingName]buildingSpecs    `json:"buildings"`
+	Units            map[tUnitName]unitSpecs            `json:"units"`
+	ResourceTrickles map[tResourceName]tResourceTrickle `json:"resources"`
 }
 
 var (
@@ -71,18 +67,8 @@ func init() {
 	// TODO: basic checks for consistency
 	// * levels / costs / multipliers match
 	// * costs are done with existing resources
-
-	for n, v := range readOnlyConfig.EconomicBuildings {
-		if len(v.UpgradeCost) != len(v.Multiplier)-1 || len(v.UpgradeCost) != v.MaxLevel {
-			panic(fmt.Sprintf("building %s has defined %d multipliers with max level %d and %d upgrade costs", n, len(v.UpgradeCost), v.MaxLevel, len(v.Multiplier)-1))
-		}
-	}
-
-	for n, v := range readOnlyConfig.MilitaryBuildings {
-		if len(v.UpgradeCost) != len(v.Multiplier)-1 || len(v.UpgradeCost) != v.MaxLevel {
-			panic(fmt.Sprintf("building %s has defined %d multipliers with max level %d and %d upgrade costs", n, len(v.UpgradeCost), v.MaxLevel, len(v.Multiplier)-1))
-		}
-	}
+	// * check if buildings define training multipliers if they train units
+	// * check if buildings define trickle multipliers if they produce resources
 
 	// NOTE: setup some pre-calculations for easier game logic
 
@@ -97,7 +83,7 @@ func init() {
 	readOnlyResourceMultipliers := make(map[tResourceName][]tBuildingName, len(readOnlyConfig.ResourceTrickles))
 	for resourceKey := range readOnlyConfig.ResourceTrickles {
 		readOnlyResourceMultipliers[resourceKey] = make([]tBuildingName, 0)
-		for buildingKey, building := range readOnlyConfig.EconomicBuildings {
+		for buildingKey, building := range readOnlyConfig.Buildings {
 			if !building.Resources[resourceKey] {
 				continue
 			}
@@ -107,7 +93,7 @@ func init() {
 	readOnlyTrainingMultipliers := make(map[tUnitName][]tBuildingName, len(readOnlyConfig.Units))
 	for unitKey := range readOnlyConfig.Units {
 		readOnlyTrainingMultipliers[unitKey] = make([]tBuildingName, 0)
-		for buildingKey, building := range readOnlyConfig.MilitaryBuildings {
+		for buildingKey, building := range readOnlyConfig.Buildings {
 			if !building.Units[unitKey] {
 				continue
 			}

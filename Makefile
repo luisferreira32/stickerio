@@ -5,7 +5,6 @@ _gen_oas_api: generated/
 
 generated/: api.yaml
 	rm -rf generated
-	rm -rf models
 	docker run --user $$(id -u):$$(id -g) --rm -v $$PWD:/local -w /local openapitools/openapi-generator-cli generate -i /local/api.yaml -g go -o /local/generated --additional-properties=packageName=generated
 	mkdir -p models/ && cp generated/*.go models/
 

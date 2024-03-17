@@ -22,10 +22,10 @@
             "productionSpeed": 10000
         }
     },
-    "militaryBuildings": {
+    "buildings": {
         "barracks": {
             "maxLevel": 6,
-            "multiplier": [
+            "trainingMultiplier": [
                 1.0,
                 0.9,
                 0.8,
@@ -33,6 +33,14 @@
                 0.7,
                 0.68,
                 0.66
+            ],
+            "upgradeSpeed": [
+                10,
+                10,
+                10,
+                10,
+                10,
+                10
             ],
             "cost": [
                 {
@@ -65,12 +73,10 @@
                 "swordsmen": true,
                 "god": false
             }
-        }
-    },
-    "economicBuildings": {
+        },
         "mines": {
             "maxLevel": 6,
-            "multiplier": [
+            "resourceMultiplier": [
                 1.0,
                 1.5,
                 2.0,
@@ -78,6 +84,14 @@
                 4.0,
                 6.0,
                 10.0
+            ],
+            "upgradeSpeed": [
+                10,
+                10,
+                10,
+                10,
+                10,
+                10
             ],
             "cost": [
                 {
@@ -112,11 +126,16 @@
         },
         "mason": {
             "maxLevel": 3,
-            "multiplier": [
+            "resourceMultiplier": [
                 1.0,
                 2.5,
                 5.0,
                 12.5
+            ],
+            "upgradeSpeed": [
+                10,
+                10,
+                10
             ],
             "cost": [
                 {

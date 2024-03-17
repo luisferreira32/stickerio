@@ -83,16 +83,15 @@ ORDER BY epoch, id
 }
 
 type dbCity struct {
-	id                     string
-	name                   string
-	playerID               string
-	locationX              int32
-	locationY              int32
-	economicBuildingsLevel string
-	militaryBuildingsLevel string
-	resourceBase           string
-	resourceEpoch          int64
-	unitCount              string
+	id             string
+	name           string
+	playerID       string
+	locationX      int32
+	locationY      int32
+	buildingsLevel string
+	resourceBase   string
+	resourceEpoch  int64
+	unitCount      string
 }
 
 func (r *StickerioRepository) GetCity(ctx context.Context, id, playerID string) (*dbCity, error) {
@@ -103,8 +102,7 @@ city_name,
 player_id,
 location_x,
 location_y,
-b_economic_level,
-b_military_level,
+b_level,
 r_base,
 r_epoch,
 u_count
@@ -126,8 +124,7 @@ WHERE id=$1 AND player_id=$2
 			&result.playerID,
 			&result.locationX,
 			&result.locationY,
-			&result.economicBuildingsLevel,
-			&result.militaryBuildingsLevel,
+			&result.buildingsLevel,
 			&result.resourceBase,
 			&result.resourceEpoch,
 			&result.unitCount,
@@ -268,12 +265,11 @@ city_name,
 player_id,
 location_x,
 location_y,
-b_economic_level,
-b_military_level,
+b_level,
 r_base,
 r_epoch,
 u_count)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT(id) REPLACE
 `
 
@@ -285,14 +281,31 @@ ON CONFLICT(id) REPLACE
 		c.playerID,
 		c.locationX,
 		c.locationY,
-		c.economicBuildingsLevel,
-		c.militaryBuildingsLevel,
+		c.buildingsLevel,
 		c.resourceBase,
 		c.resourceEpoch,
 		c.unitCount,
 	)
 	if err != nil {
 		return fmt.Errorf("upsertCityQuery failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *StickerioRepository) DeleteCity(ctx context.Context, cityID string) error {
+	const deleteCityQuery = `
+DELETE FROM city_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteCityQuery,
+		cityID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteCityQuery failed: %w", err)
 	}
 
 	return nil
@@ -475,6 +488,24 @@ ON CONFLICT(id) REPLACE
 	return nil
 }
 
+func (r *StickerioRepository) DeleteMovement(ctx context.Context, movementID string) error {
+	const deleteMovementQuery = `
+DELETE FROM movements_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteMovementQuery,
+		movementID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteMovementQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbUnitQueueItem struct {
 	id          string
 	cityID      string
@@ -601,12 +632,30 @@ ON CONFLICT(id) REPLACE
 	return nil
 }
 
+func (r *StickerioRepository) DeleteUnitQueueItem(ctx context.Context, unitQueueItemID string) error {
+	const deleteUnitQueueItemQuery = `
+DELETE FROM unit_queue_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteUnitQueueItemQuery,
+		unitQueueItemID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteUnitQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
 type dbBuildingQueueItem struct {
 	id             string
 	cityID         string
 	queuedEpoch    int64
 	durationSec    int64
-	targetLevel    int32
+	targetLevel    int64
 	targetBuilding string
 }
 
@@ -722,6 +771,24 @@ ON CONFLICT(id) REPLACE
 	)
 	if err != nil {
 		return fmt.Errorf("upsertBuildingQueueItemQuery failed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *StickerioRepository) DeleteBuildingQueueItem(ctx context.Context, buildingQueueItemID string) error {
+	const deleteBuildingQueueItemQuery = `
+DELETE FROM building_queue_view
+WHERE id=$1
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		deleteBuildingQueueItemQuery,
+		buildingQueueItemID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleteBuildingQueueItemQuery failed: %w", err)
 	}
 
 	return nil

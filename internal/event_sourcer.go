@@ -18,6 +18,8 @@ const (
 	arrivalMovementEventName = "arrival"
 	queueUnitEventName       = "queueunit"
 	createUnitEventName      = "createunit"
+	queueBuildingEventName   = "queuebuilding"
+	upgradeBuildingEventName = "upgradebuilding"
 )
 
 var (
@@ -74,10 +76,32 @@ type queueUnitEvent struct {
 // If the cityID still belongs to the original player, new units will be added to the city.
 // If the city was conquered by a different player, nothing will happen.
 type createUnitEvent struct {
-	CityID    tCityID   `json:"cityID"`
-	PlayerID  tPlayerID `json:"playerID"`
-	UnitCount int64     `json:"unitCount"`
-	UnitType  tUnitName `json:"unitType"`
+	UnitQueueItemID tItemID   `json:"unitQueueItemID"`
+	CityID          tCityID   `json:"cityID"`
+	PlayerID        tPlayerID `json:"playerID"`
+	UnitCount       int64     `json:"unitCount"`
+	UnitType        tUnitName `json:"unitType"`
+}
+
+// Inserted when a request to queue a building upgrade is done.
+type queueBuildingEvent struct {
+	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
+	CityID              tCityID       `json:"cityID"`
+	PlayerID            tPlayerID     `json:"playerID"`
+	QueuedEpoch         tEpoch        `json:"queuedEpoch"`
+	TargetLevel         int64         `json:"targetLevel"`
+	TargetBuilding      tBuildingName `json:"targetBuilding"`
+}
+
+// Inserted when a queueBuildingEvent is processed.
+// If the cityID still belongs to the original player, the building is upgraded.
+// If the city was conquered by a different player, nothing will happen.
+type upgradeBuildingEvent struct {
+	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
+	CityID              tCityID       `json:"cityID"`
+	PlayerID            tPlayerID     `json:"playerID"`
+	TargetLevel         int64         `json:"targetLevel"`
+	TargetBuilding      tBuildingName `json:"targetBuilding"`
 }
 
 type eventsRepository interface {
@@ -87,6 +111,10 @@ type eventsRepository interface {
 	UpsertCity(ctx context.Context, m *dbCity) error
 	UpsertUnitQueueItem(ctx context.Context, m *dbUnitQueueItem) error
 	UpsertBuildingQueueItem(ctx context.Context, m *dbBuildingQueueItem) error
+	DeleteMovement(ctx context.Context, id string) error
+	DeleteCity(ctx context.Context, id string) error
+	DeleteUnitQueueItem(ctx context.Context, id string) error
+	DeleteBuildingQueueItem(ctx context.Context, id string) error
 }
 
 type upsertIDs struct {
@@ -232,7 +260,15 @@ func (s *EventSourcer) reSyncEvents(ctx context.Context) error {
 
 func (s *EventSourcer) upsertViews(ctx context.Context) error {
 	for cityID := range s.toUpsert.cities {
-		dbc, err := cityToDBModel(s.cityList[cityID])
+		c, ok := s.cityList[cityID]
+		if !ok {
+			err := s.repository.DeleteCity(ctx, string(cityID))
+			if err != nil {
+				return err
+			}
+			// TODO: also delete all view tables queue items
+		}
+		dbc, err := cityToDBModel(c)
 		if err != nil {
 			return err
 		}
@@ -242,7 +278,14 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 		}
 	}
 	for movementID := range s.toUpsert.movements {
-		dbm, err := movementToDBModel(s.movementList[movementID])
+		m, ok := s.movementList[movementID]
+		if !ok {
+			err := s.repository.DeleteMovement(ctx, string(movementID))
+			if err != nil {
+				return err
+			}
+		}
+		dbm, err := movementToDBModel(m)
 		if err != nil {
 			return err
 		}
@@ -253,16 +296,30 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 	}
 	for cityID, unitQ := range s.toUpsert.unitQ {
 		for itemID := range unitQ {
-			dbitem := unitQueueItemToDBModel(s.unitQueuesPerCity[cityID][itemID])
+			item, ok := s.unitQueuesPerCity[cityID][itemID]
+			if !ok {
+				err := s.repository.DeleteUnitQueueItem(ctx, string(itemID))
+				if err != nil {
+					return err
+				}
+			}
+			dbitem := unitQueueItemToDBModel(item)
 			err := s.repository.UpsertUnitQueueItem(ctx, dbitem)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	for cityID, unitQ := range s.toUpsert.buildingQ {
-		for itemID := range unitQ {
-			dbitem := buildingQueueItemToDBModel(s.buildingQueuesPerCity[cityID][itemID])
+	for cityID, buildingQ := range s.toUpsert.buildingQ {
+		for itemID := range buildingQ {
+			item, ok := s.buildingQueuesPerCity[cityID][itemID]
+			if !ok {
+				err := s.repository.DeleteBuildingQueueItem(ctx, string(itemID))
+				if err != nil {
+					return err
+				}
+			}
+			dbitem := buildingQueueItemToDBModel(item)
 			err := s.repository.UpsertBuildingQueueItem(ctx, dbitem)
 			if err != nil {
 				return err
@@ -380,6 +437,8 @@ func (s *EventSourcer) processArrivalMovementEvent(_ context.Context, e *event) 
 
 	// insert chain events
 	// upsert cached table and signal future view table upsert
+
+	// TODO: remove previous movement event
 	return nil
 }
 
@@ -400,10 +459,11 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 
 	// insert chain events
 	createUnit := &createUnitEvent{
-		CityID:    queueUnit.CityID,
-		PlayerID:  queueUnit.PlayerID,
-		UnitCount: queueUnit.UnitCount,
-		UnitType:  queueUnit.UnitType,
+		UnitQueueItemID: queueUnit.UnitQueueItemID,
+		CityID:          queueUnit.CityID,
+		PlayerID:        queueUnit.PlayerID,
+		UnitCount:       queueUnit.UnitCount,
+		UnitType:        queueUnit.UnitType,
 	}
 	payload, err := json.Marshal(createUnit)
 	if err != nil {
@@ -429,6 +489,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 		unitCount:   queueUnit.UnitCount,
 		unitType:    string(queueUnit.UnitType),
 	}
+	s.unitQueuesPerCity[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = queueItem
 	s.toUpsert.unitQ[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = struct{}{}
 
 	return nil
@@ -446,11 +507,101 @@ func (s *EventSourcer) processCreateUnitEvent(_ context.Context, e *event) error
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "city has changed owner")
 	}
 	s.cityList[createUnit.CityID].unitCount[string(createUnit.UnitType)] += int64(createUnit.UnitCount)
+	delete(s.unitQueuesPerCity[createUnit.CityID], createUnit.UnitQueueItemID)
 
 	// insert chain events
 
 	// upsert cached table and signal future view table upsert
 	s.toUpsert.cities[createUnit.CityID] = struct{}{}
+	s.toUpsert.unitQ[createUnit.CityID][createUnit.UnitQueueItemID] = struct{}{}
+
+	return nil
+}
+
+func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) error {
+	// parsing
+	queueBuilding := queueBuildingEvent{}
+	err := json.Unmarshal([]byte(e.payload), &queueBuilding)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	targetBuildingSpecs := readOnlyConfig.Buildings[queueBuilding.TargetBuilding]
+	if queueBuilding.TargetLevel > int64(targetBuildingSpecs.MaxLevel) {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot upgrade past max level")
+	}
+	currentBuildingLevel := s.cityList[queueBuilding.CityID].buildingsLevel[string(queueBuilding.TargetBuilding)]
+	if queueBuilding.TargetLevel > currentBuildingLevel+1 {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "only upgrade 1 level at a time")
+	}
+	upgradeCost := targetBuildingSpecs.UpgradeCost[currentBuildingLevel]
+	err = recalculateResources(int64(queueBuilding.QueuedEpoch), upgradeCost, s.cityList[queueBuilding.CityID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+	}
+	upgradeDurationSec := targetBuildingSpecs.UpgradeSpeed[currentBuildingLevel]
+
+	// insert chain events
+	upgradeBuilding := &upgradeBuildingEvent{
+		BuildingQueueItemID: queueBuilding.BuildingQueueItemID,
+		CityID:              queueBuilding.CityID,
+		PlayerID:            queueBuilding.PlayerID,
+		TargetLevel:         queueBuilding.TargetLevel,
+		TargetBuilding:      queueBuilding.TargetBuilding,
+	}
+	payload, err := json.Marshal(upgradeBuilding)
+	if err != nil {
+		return err
+	}
+	chainEvent := &event{
+		id:      uuid.NewString(),
+		name:    upgradeBuildingEventName,
+		epoch:   int64(queueBuilding.QueuedEpoch) + int64(upgradeDurationSec),
+		payload: string(payload),
+	}
+	err = s.repository.InsertEvent(ctx, chainEvent)
+	if err != nil {
+		return err
+	}
+
+	// upsert cached table and signal future view table upsert
+	queueItem := &buildingQueueItem{
+		id:             string(queueBuilding.BuildingQueueItemID),
+		cityID:         string(queueBuilding.CityID),
+		queuedEpoch:    int64(queueBuilding.QueuedEpoch),
+		durationSec:    upgradeDurationSec,
+		targetLevel:    queueBuilding.TargetLevel,
+		targetBuilding: string(queueBuilding.TargetBuilding),
+	}
+	s.buildingQueuesPerCity[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = queueItem
+	s.toUpsert.buildingQ[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = struct{}{}
+
+	return nil
+}
+
+func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) error {
+	// parsing
+	upgradeBuilding := upgradeBuildingEvent{}
+	err := json.Unmarshal([]byte(e.payload), &upgradeBuilding)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	// HACK: pass a zero cost event to re-calculate the base and increment the epoch
+	err = recalculateResources(int64(e.epoch), make(tResourceCount), s.cityList[upgradeBuilding.CityID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+	}
+	s.cityList[upgradeBuilding.CityID].buildingsLevel[string(upgradeBuilding.TargetBuilding)] = int64(upgradeBuilding.TargetLevel)
+	delete(s.buildingQueuesPerCity[upgradeBuilding.CityID], upgradeBuilding.BuildingQueueItemID)
+
+	// insert chain events
+
+	// upsert cached table and signal future view table upsert
+	s.toUpsert.cities[upgradeBuilding.CityID] = struct{}{}
+	s.toUpsert.buildingQ[upgradeBuilding.CityID][upgradeBuilding.BuildingQueueItemID] = struct{}{}
 
 	return nil
 }
@@ -465,7 +616,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		multiplier := 1.0
 		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
-			multiplier *= readOnlyConfig.EconomicBuildings[buildingKey].Multiplier[c.economicBuildingsLevel[string(buildingKey)]]
+			multiplier *= readOnlyConfig.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[string(buildingKey)]]
 		}
 		currentResources := int64(float64(c.resourceBase[resourceName]) +
 			float64(epoch-c.resourceEpoch)*
@@ -484,7 +635,7 @@ func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		multiplier := 1.0
 		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
-			multiplier *= readOnlyConfig.EconomicBuildings[buildingKey].Multiplier[c.economicBuildingsLevel[string(buildingKey)]]
+			multiplier *= readOnlyConfig.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[string(buildingKey)]]
 		}
 		currentResources := int64(float64(c.resourceBase[resourceName]) +
 			float64(epoch-c.resourceEpoch)*
@@ -526,7 +677,7 @@ func getTrainingDuration(unitCount int64, unitName tUnitName, c *city) int64 {
 	multiplier := 1.0
 	for _, buildingKey := range readOnlyTrainingMultipliers[unitName] {
 		// TODO: formalize these equations to calculate game time
-		multiplier *= readOnlyConfig.MilitaryBuildings[buildingKey].Multiplier[c.militaryBuildingsLevel[string(buildingKey)]]
+		multiplier *= readOnlyConfig.Buildings[buildingKey].TrainingMultiplier[c.buildingsLevel[string(buildingKey)]]
 	}
 	return int64(float64(readOnlyConfig.Units[unitName].UnitProductionSpeedSec*unitCount) * multiplier)
 }

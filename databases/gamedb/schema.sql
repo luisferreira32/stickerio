@@ -17,8 +17,7 @@ create table if not exists cities_view (
     player_id text,
     location_x int,
     location_y int,
-    b_economic_level text, -- json serialization of economic buildingID: level
-    b_military_level text, -- json serialization of military buildingID: level
+    b_level text, -- json serialization of buildingID: level
     r_base text, -- json serialization of resourceID: baseQuantity
     r_epoch int,
     u_count text -- json serialization of unitID: count

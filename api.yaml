@@ -161,6 +161,23 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/v1BuildingQueueItem'
+    post:
+      summary: Add a queue item.
+      parameters:
+        - in: path
+          name: cityid
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/v1BuildingQueueItem'
+      responses:
+        '201':
+          description: Created
   /v1/cities/{cityid}/buildingqitems/{itemid}:
     get:
       summary: Get a building queue item.
@@ -244,13 +261,11 @@ components:
   schemas:
     v1City:
       type: object
-      required: [cityInfo, economicBuildings, militaryBuildings, cityResources, unitCount]
+      required: [cityInfo, buildings, cityResources, unitCount]
       properties:
         cityInfo:
           $ref: '#/components/schemas/v1CityInfo'
-        economicBuildings:
-          $ref: '#/components/schemas/v1CityBuildings'
-        militaryBuildings:
+        buildings:
           $ref: '#/components/schemas/v1CityBuildings'
         cityResources:
           $ref: '#/components/schemas/v1CityResources'
@@ -325,6 +340,7 @@ components:
           format: int64
         level:
           type: integer
+          format: int64
         building:
           type: string
     v1Movement:
