@@ -340,6 +340,7 @@ components:
           format: int64
         level:
           type: integer
+          format: int64
         building:
           type: string
     v1Movement:

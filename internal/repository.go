@@ -601,7 +601,7 @@ type dbBuildingQueueItem struct {
 	cityID         string
 	queuedEpoch    int64
 	durationSec    int64
-	targetLevel    int32
+	targetLevel    int64
 	targetBuilding string
 }
 
