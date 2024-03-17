@@ -24,16 +24,6 @@ var (
 	errPreConditionFailed = fmt.Errorf("pre-condition failed")
 )
 
-// NOTE: this types exist to make sure event sourcing compares are against valid types
-
-type tMovementID string
-type tPlayerID string
-type tCityID string
-type tEpoch int64
-type tUnitCount int32
-type tResourceCount int64
-type tItemID string
-
 // Inserted when a player starts a movement.
 // Its processing generates an arrivalMovementEvent at a later epcoh (calculated based on distance between cities / speed).
 type startMovementEvent struct {
@@ -42,10 +32,8 @@ type startMovementEvent struct {
 	OriginID       tCityID        `json:"originID"`
 	DestinationID  tCityID        `json:"destinationID"`
 	DepartureEpoch tEpoch         `json:"departureEpoch"`
-	StickmenCount  tUnitCount     `json:"stickmenCount"`
-	SwordsmenCount tUnitCount     `json:"swordsmenCount"`
-	SticksCount    tResourceCount `json:"sticksCount"`
-	CirclesCount   tResourceCount `json:"circlesCount"`
+	UnitCount      tUnitCount     `json:"unitCount"`
+	ResourceCount  tResourceCount `json:"resourceCount"`
 }
 
 // Inserted when a startMovementEvent is processed.
@@ -55,20 +43,19 @@ type startMovementEvent struct {
 // * forage if it's abandoned
 // Then, based on survival (if any), if the current city is not owned by the player (i.e., it was not a reinforce), re-calculate a startMovement event and schedule it.
 type arrivalMovementEvent struct {
-	MovementID     tMovementID    `json:"movementID"`
-	PlayerID       tPlayerID      `json:"playerID"`
-	OriginID       tCityID        `json:"originID"`
-	DestinationID  tCityID        `json:"destinationID"`
-	SwordsmenCount tUnitCount     `json:"swordsmenCount"`
-	StickmenCount  tUnitCount     `json:"stickmenCount"`
-	SticksCount    tResourceCount `json:"sticksCount"`
-	CirclesCount   tResourceCount `json:"circlesCount"`
+	MovementID    tMovementID    `json:"movementID"`
+	PlayerID      tPlayerID      `json:"playerID"`
+	OriginID      tCityID        `json:"originID"`
+	DestinationID tCityID        `json:"destinationID"`
+	UnitCount     tUnitCount     `json:"unitCount"`
+	ResourceCount tResourceCount `json:"resourceCount"`
 }
 
 type eventsRepository interface {
 	InsertEvent(ctx context.Context, e *event) error
 	ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error)
-	UpsertMovement(ctx context.Context, m *movement) error
+	UpsertMovement(ctx context.Context, m *dbMovement) error
+	UpsertCity(ctx context.Context, m *dbCity) error
 }
 
 // The EventSourcer is the magic of this game.
@@ -192,31 +179,29 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	if err != nil {
 		return err
 	}
+	epoch := time.Now().Unix()
 
 	// validation
 	if startMovement.OriginID == startMovement.DestinationID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot move to the same city")
 	}
-	originCity := s.cityList[startMovement.OriginID]
-	currentSticks := currentResources(originCity.sticksCountBase, originCity.sticksCountEpoch, sticks)
-	currentCircles := currentResources(originCity.circlesCountBase, originCity.circlesCountEpoch, circles)
-	if tUnitCount(originCity.stickmenCount) < startMovement.StickmenCount ||
-		tUnitCount(originCity.swordsmenCount) < startMovement.SwordsmenCount ||
-		currentSticks < startMovement.SticksCount ||
-		currentCircles < startMovement.CirclesCount {
-		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "insuficient resources/units")
+	err = recalculateResources(epoch, startMovement.ResourceCount, s.cityList[startMovement.OriginID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+	}
+	err = recalculateUnits(startMovement.UnitCount, s.cityList[startMovement.OriginID])
+	if err != nil {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
 
 	// insert new event
 	arrival := &arrivalMovementEvent{
-		MovementID:     startMovement.MovementID,
-		PlayerID:       startMovement.PlayerID,
-		OriginID:       startMovement.OriginID,
-		DestinationID:  startMovement.DestinationID,
-		StickmenCount:  startMovement.StickmenCount,
-		SwordsmenCount: startMovement.SwordsmenCount,
-		SticksCount:    startMovement.SticksCount,
-		CirclesCount:   startMovement.CirclesCount,
+		MovementID:    startMovement.MovementID,
+		PlayerID:      startMovement.PlayerID,
+		OriginID:      startMovement.OriginID,
+		DestinationID: startMovement.DestinationID,
+		UnitCount:     startMovement.UnitCount,
+		ResourceCount: startMovement.ResourceCount,
 	}
 	payload, err := json.Marshal(arrival)
 	if err != nil {
@@ -230,20 +215,31 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	}
 	s.queueEventHandling(chainEvent)
 
-	// upsert view table
+	// upsert view/cached table
 	m := &movement{
 		id:             string(startMovement.MovementID),
 		playerID:       string(startMovement.PlayerID),
 		originID:       string(startMovement.OriginID),
 		destinationID:  string(startMovement.DestinationID),
-		departureEpoch: int64(startMovement.DepartureEpoch),
-		circlesCount:   int32(startMovement.StickmenCount),
-		stickCount:     int32(startMovement.SwordsmenCount),
-		stickmenCount:  int32(startMovement.SticksCount),
-		swordmenCount:  int32(startMovement.CirclesCount),
-		speed:          getMovementSpeed(startMovement.StickmenCount, startMovement.SwordsmenCount),
+		departureEpoch: epoch,
+		speed:          getMovementSpeed(startMovement.UnitCount),
+		resourceCount:  startMovement.ResourceCount,
+		unitCount:      startMovement.UnitCount,
 	}
-	err = s.repository.UpsertMovement(ctx, m)
+	s.movementList[startMovement.MovementID] = m
+	dbm, err := movementToDBModel(m)
+	if err != nil {
+		return err
+	}
+	err = s.repository.UpsertMovement(ctx, dbm)
+	if err != nil {
+		return err
+	}
+	dbc, err := cityToDBModel(s.cityList[startMovement.OriginID])
+	if err != nil {
+		return err
+	}
+	err = s.repository.UpsertCity(ctx, dbc)
 	if err != nil {
 		return err
 	}
@@ -251,21 +247,60 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	return nil
 }
 
-func getMovementSpeed(stickmenCount, swordsmenCount tUnitCount) float32 {
-	var movementSpeed float32
-	for _, slowUnit := range slowestUnits {
-		if slowUnit == stickmen && stickmenCount > 0 {
-			movementSpeed = config.Units[stickmen].UnitSpeed
-			break
+func recalculateResources(epoch int64, cost tResourceCount, c *city) error {
+	missingResources := ""
+	for resourceName, resourceCost := range cost {
+		if c.resourceBase[resourceName] > resourceCost {
+			continue
 		}
-		if slowUnit == stickmen && swordsmenCount > 0 {
-			movementSpeed = config.Units[stickmen].UnitSpeed
-			break
+		// TODO: more efficient than this
+		currentResources := int64(float32(c.resourceBase[resourceName]) +
+			float32(epoch-c.resourceEpoch)*
+				float32(config.ResourceTrickles[tResourceName(resourceName)])*
+				config.EconomicBuildings[tBuildingName("mines")].Multiplier[c.mineLevel])
+		if currentResources > resourceCost {
+			continue
 		}
+		missingResources += fmt.Sprintf("missing %s resources", resourceName)
 	}
-	return movementSpeed
+	if missingResources != "" {
+		return fmt.Errorf(missingResources)
+	}
+
+	c.resourceEpoch = epoch
+	for resourceName := range c.resourceBase {
+		currentResources := int64(float32(c.resourceBase[resourceName]) +
+			float32(epoch-c.resourceEpoch)*
+				float32(config.ResourceTrickles[tResourceName(resourceName)])*
+				config.EconomicBuildings[tBuildingName("mines")].Multiplier[c.mineLevel])
+		c.resourceBase[resourceName] = currentResources - cost[resourceName]
+	}
+	return nil
 }
 
-func currentResources(base, epoch int64, n resourceName) tResourceCount {
-	return tResourceCount(base + epoch*int64(config.ResourceTrickles[n]))
+func recalculateUnits(cost tUnitCount, c *city) error {
+	insufficientUnits := ""
+	for unitName, unitCount := range cost {
+		if c.unitCount[unitName] > unitCount {
+			continue
+		}
+		insufficientUnits += fmt.Sprintf("missing %s units", unitName)
+	}
+	if insufficientUnits != "" {
+		return fmt.Errorf(insufficientUnits)
+	}
+	for unitName, unitCount := range cost {
+		c.unitCount[unitName] -= unitCount
+	}
+	return nil
+}
+
+func getMovementSpeed(unitCount tUnitCount) float32 {
+	for _, unitName := range slowestUnits {
+		if unitCount[string(unitName)] > 0 {
+			return config.Units[unitName].UnitSpeed
+		}
+	}
+	// NOTE: this should not happen, as movements would only happen with pre-existing units
+	return 1.0
 }

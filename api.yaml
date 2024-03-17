@@ -261,38 +261,23 @@ components:
           type: integer
     v1CityResources:
       type: object
-      required: [sticksCountBase, sticksCountEpoch, circlesCountBase, circlesCountEpoch]
+      required: [epoch, baseCount]
       properties:
-        sticksCountBase:
+        epoch:
           type: integer
           format: int64
-        sticksCountEpoch:
-          type: integer
-          format: int64
-        circlesCountBase:
-          type: integer
-          format: int64
-        circlesCountEpoch:
-          type: integer
-          format: int64
+        baseCount:
+          $ref: '#/components/schemas/v1ResourceCount'
     v1UnitCount:
       type: object
-      required: [stickmenCount, swordsmenCount]
-      properties:
-        stickmenCount:
-          type: integer
-        swordsmenCount:
-          type: integer
+      additionalProperties: 
+        type: integer
+        format: int64
     v1ResourceCount:
       type: object
-      required: [sticksCount, circlesCount]
-      properties:
-        sticksCount:
-          type: integer
-          format: int64
-        circlesCount:
-          type: integer
-          format: int64
+      additionalProperties: 
+        type: integer
+        format: int64
     v1UnitQueueItem:
       type: object
       required: [id, queuedEpoch, durationSec, unitCount, unitType]

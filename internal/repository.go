@@ -10,17 +10,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func NewStickerioRepository(dataSourceName string) *StickerioRepositoryImpl {
+func NewStickerioRepository(dataSourceName string) *StickerioRepository {
 	db, err := sql.Open("sqlite", dataSourceName) // TODO: don't use sqlite
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &StickerioRepositoryImpl{
+	return &StickerioRepository{
 		db: db,
 	}
 }
 
-type StickerioRepositoryImpl struct {
+type StickerioRepository struct {
 	db *sql.DB
 }
 
@@ -31,7 +31,7 @@ type event struct {
 	payload string // TODO: json encode might not be the most efficient way - improve this
 }
 
-func (r *StickerioRepositoryImpl) InsertEvent(ctx context.Context, e *event) error {
+func (r *StickerioRepository) InsertEvent(ctx context.Context, e *event) error {
 	const insertEventQuery = `
 INSERT INTO event_source(id, event_name, epoch, payload) VALUES ($1, $2, $3, $4)
 ON CONFLICT(id) DO NOTHING
@@ -43,7 +43,7 @@ ON CONFLICT(id) DO NOTHING
 	return nil
 }
 
-func (r *StickerioRepositoryImpl) ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error) {
+func (r *StickerioRepository) ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error) {
 	const listEventsQuery = `
 SELECT
 id,
@@ -82,23 +82,20 @@ ORDER BY epoch, id
 	return results, nil
 }
 
-type city struct {
-	id                string
-	name              string
-	playerID          string
-	locationX         int32
-	locationY         int32
-	mineLevel         int32
-	barracksLevel     int32
-	sticksCountBase   int64
-	sticksCountEpoch  int64
-	circlesCountBase  int64
-	circlesCountEpoch int64
-	stickmenCount     int32
-	swordsmenCount    int32
+type dbCity struct {
+	id            string
+	name          string
+	playerID      string
+	locationX     int32
+	locationY     int32
+	mineLevel     int32
+	barracksLevel int32
+	resourceBase  string
+	resourceEpoch int64
+	unitCount     string
 }
 
-func (r *StickerioRepositoryImpl) GetCity(ctx context.Context, id, playerID string) (*city, error) {
+func (r *StickerioRepository) GetCity(ctx context.Context, id, playerID string) (*dbCity, error) {
 	const getCityQuery = `
 SELECT
 id,
@@ -108,12 +105,9 @@ location_x,
 location_y,
 b_mine_level,
 b_barracks_level,
-r_stick_count_base,
-r_stick_count_epoch,
-r_circles_count_base,
-r_circles_count_epoch,
-u_stickmen_count,
-u_swordmen_count
+r_base,
+r_epoch,
+u_count
 FROM cities_view
 WHERE id=$1 AND player_id=$2
 `
@@ -123,7 +117,7 @@ WHERE id=$1 AND player_id=$2
 		return nil, fmt.Errorf("getCityQuery failed: %w", err)
 	}
 
-	result := &city{}
+	result := &dbCity{}
 
 	for rows.Next() {
 		err := rows.Scan(
@@ -134,12 +128,9 @@ WHERE id=$1 AND player_id=$2
 			&result.locationY,
 			&result.mineLevel,
 			&result.barracksLevel,
-			&result.sticksCountBase,
-			&result.sticksCountEpoch,
-			&result.circlesCountBase,
-			&result.circlesCountEpoch,
-			&result.stickmenCount,
-			&result.swordsmenCount,
+			&result.resourceBase,
+			&result.resourceEpoch,
+			&result.unitCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("rows scan: %w", err)
@@ -153,7 +144,7 @@ WHERE id=$1 AND player_id=$2
 	return result, nil
 }
 
-func (r *StickerioRepositoryImpl) GetCityInfo(ctx context.Context, id string) (*city, error) {
+func (r *StickerioRepository) GetCityInfo(ctx context.Context, id string) (*dbCity, error) {
 	const getCityInfoQuery = `
 SELECT
 id,
@@ -170,7 +161,7 @@ WHERE id=$1
 		return nil, fmt.Errorf("getCityInfoQuery failed: %w", err)
 	}
 
-	result := &city{}
+	result := &dbCity{}
 
 	for rows.Next() {
 		err := rows.Scan(
@@ -217,7 +208,7 @@ func withinLocation(x1, y1, x2, y2 int) []listCityInfoFilterOpt {
 	}
 }
 
-func (r *StickerioRepositoryImpl) ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*city, error) {
+func (r *StickerioRepository) ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*dbCity, error) {
 	filtersQuery := "WHERE id>$1"
 	filtersValues := make([]interface{}, 0, len(filters))
 	filtersValues = append(filtersValues, lastID, pageSize)
@@ -245,10 +236,10 @@ LIMIT $2
 		return nil, fmt.Errorf("listCityInfoQuery failed: %w", err)
 	}
 
-	results := make([]*city, 0, pageSize)
+	results := make([]*dbCity, 0, pageSize)
 
 	for rows.Next() {
-		result := &city{}
+		result := &dbCity{}
 		err := rows.Scan(
 			&result.id,
 			&result.name,
@@ -269,20 +260,56 @@ LIMIT $2
 	return results, nil
 }
 
-type movement struct {
+func (r *StickerioRepository) UpsertCity(ctx context.Context, c *dbCity) error {
+	const upsertCityQuery = `
+INSERT INTO city_view(
+id,
+city_name,
+player_id,
+location_x,
+location_y,
+b_mine_level,
+b_barracks_level,
+r_base,
+r_epoch,
+u_count)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT(id) REPLACE
+`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		upsertCityQuery,
+		c.id,
+		c.name,
+		c.playerID,
+		c.locationX,
+		c.locationY,
+		c.mineLevel,
+		c.barracksLevel,
+		c.resourceBase,
+		c.resourceEpoch,
+		c.unitCount,
+	)
+	if err != nil {
+		return fmt.Errorf("upsertCityQuery failed: %w", err)
+	}
+
+	return nil
+}
+
+type dbMovement struct {
 	id             string
 	playerID       string
 	originID       string
 	destinationID  string
 	departureEpoch int64
 	speed          float32
-	circlesCount   int32
-	stickCount     int32
-	stickmenCount  int32
-	swordmenCount  int32
+	resourceCount  string
+	unitCount      string
 }
 
-func (r *StickerioRepositoryImpl) GetMovement(ctx context.Context, id, playerID string) (*movement, error) {
+func (r *StickerioRepository) GetMovement(ctx context.Context, id, playerID string) (*dbMovement, error) {
 	const getMovementQuery = `
 SELECT
 id,
@@ -291,10 +318,8 @@ origin_id,
 destination_id,
 departure_epoch,
 speed,
-r_circles_count,
-r_stick_count,
-u_stickmen_count,
-u_swordmen_count
+r_count,
+u_count
 FROM movements_view
 WHERE id=$1 AND player_id=$2
 `
@@ -304,7 +329,7 @@ WHERE id=$1 AND player_id=$2
 		return nil, fmt.Errorf("getMovementQuery failed: %w", err)
 	}
 
-	result := &movement{}
+	result := &dbMovement{}
 
 	for rows.Next() {
 		err := rows.Scan(
@@ -314,10 +339,8 @@ WHERE id=$1 AND player_id=$2
 			&result.destinationID,
 			&result.departureEpoch,
 			&result.speed,
-			&result.circlesCount,
-			&result.stickCount,
-			&result.stickmenCount,
-			&result.swordmenCount,
+			&result.resourceCount,
+			&result.unitCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("rows scan: %w", err)
@@ -339,7 +362,7 @@ func withOriginCityID(cityID string) listMovementsFilterOpt {
 	}
 }
 
-func (r *StickerioRepositoryImpl) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*movement, error) {
+func (r *StickerioRepository) ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*dbMovement, error) {
 	filtersQuery := "WHERE player_id=$1 AND id>$1"
 	filtersValues := make([]interface{}, 0, len(filters))
 	filtersValues = append(filtersValues, playerID, lastID, pageSize)
@@ -357,10 +380,8 @@ origin_id,
 destination_id,
 departure_epoch,
 speed,
-r_circles_count,
-r_stick_count,
-u_stickmen_count,
-u_swordmen_count
+r_count,
+u_count
 FROM movements_view
 %s
 ORDER BY id
@@ -372,10 +393,10 @@ LIMIT $3
 		return nil, fmt.Errorf("listMovementQuery failed: %w", err)
 	}
 
-	results := make([]*movement, 0, pageSize)
+	results := make([]*dbMovement, 0, pageSize)
 
 	for rows.Next() {
-		result := &movement{}
+		result := &dbMovement{}
 		err := rows.Scan(
 			&result.id,
 			&result.playerID,
@@ -383,10 +404,8 @@ LIMIT $3
 			&result.destinationID,
 			&result.departureEpoch,
 			&result.speed,
-			&result.circlesCount,
-			&result.stickCount,
-			&result.stickmenCount,
-			&result.swordmenCount,
+			&result.resourceCount,
+			&result.unitCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("rows scan: %w", err)
@@ -401,7 +420,7 @@ LIMIT $3
 	return results, nil
 }
 
-func (r *StickerioRepositoryImpl) UpsertMovement(ctx context.Context, m *movement) error {
+func (r *StickerioRepository) UpsertMovement(ctx context.Context, m *dbMovement) error {
 	const upsertMovementQuery = `
 INSERT INTO movements_view(
 id,
@@ -410,11 +429,9 @@ origin_id,
 destination_id,
 departure_epoch,
 speed,
-r_circles_count,
-r_stick_count,
-u_stickmen_count,
-u_swordmen_count)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+r_count,
+u_count)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT(id) REPLACE
 `
 
@@ -427,10 +444,8 @@ ON CONFLICT(id) REPLACE
 		m.destinationID,
 		m.departureEpoch,
 		m.speed,
-		m.circlesCount,
-		m.stickCount,
-		m.stickmenCount,
-		m.swordmenCount,
+		m.resourceCount,
+		m.unitCount,
 	)
 	if err != nil {
 		return fmt.Errorf("upsertMovementQuery failed: %w", err)
@@ -439,7 +454,7 @@ ON CONFLICT(id) REPLACE
 	return nil
 }
 
-type unitQueueItem struct {
+type dbUnitQueueItem struct {
 	id          string
 	cityID      string
 	queuedEpoch int64
@@ -448,7 +463,7 @@ type unitQueueItem struct {
 	unitType    string
 }
 
-func (r *StickerioRepositoryImpl) GetUnitQueueItem(ctx context.Context, id, cityID string) (*unitQueueItem, error) {
+func (r *StickerioRepository) GetUnitQueueItem(ctx context.Context, id, cityID string) (*dbUnitQueueItem, error) {
 	const getUnitQueueItemQuery = `
 SELECT
 id,
@@ -466,7 +481,7 @@ WHERE id=$1 AND city_id=$2
 		return nil, fmt.Errorf("getUnitQueueItemQuery failed: %w", err)
 	}
 
-	result := &unitQueueItem{}
+	result := &dbUnitQueueItem{}
 
 	for rows.Next() {
 		err := rows.Scan(
@@ -489,7 +504,7 @@ WHERE id=$1 AND city_id=$2
 	return result, nil
 }
 
-func (r *StickerioRepositoryImpl) ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*unitQueueItem, error) {
+func (r *StickerioRepository) ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*dbUnitQueueItem, error) {
 	filtersValues := []interface{}{cityID, lastID, pageSize}
 	const listUnitQueueItemsQuery = `
 SELECT
@@ -510,10 +525,10 @@ LIMIT $3
 		return nil, fmt.Errorf("listUnitQueueItemsQuery failed: %w", err)
 	}
 
-	results := make([]*unitQueueItem, 0, pageSize)
+	results := make([]*dbUnitQueueItem, 0, pageSize)
 
 	for rows.Next() {
-		result := &unitQueueItem{}
+		result := &dbUnitQueueItem{}
 		err := rows.Scan(
 			&result.id,
 			&result.cityID,
@@ -535,7 +550,7 @@ LIMIT $3
 	return results, nil
 }
 
-type buildingQueueItem struct {
+type dbBuildingQueueItem struct {
 	id             string
 	cityID         string
 	queuedEpoch    int64
@@ -544,7 +559,7 @@ type buildingQueueItem struct {
 	targetBuilding string
 }
 
-func (r *StickerioRepositoryImpl) GetBuildingQueueItem(ctx context.Context, id, cityID string) (*buildingQueueItem, error) {
+func (r *StickerioRepository) GetBuildingQueueItem(ctx context.Context, id, cityID string) (*dbBuildingQueueItem, error) {
 	const getUnitQueueItemQuery = `
 SELECT
 id,
@@ -562,7 +577,7 @@ WHERE id=$1 AND city_id=$2
 		return nil, fmt.Errorf("getUnitQueueItemQuery failed: %w", err)
 	}
 
-	result := &buildingQueueItem{}
+	result := &dbBuildingQueueItem{}
 
 	for rows.Next() {
 		err := rows.Scan(
@@ -585,7 +600,7 @@ WHERE id=$1 AND city_id=$2
 	return result, nil
 }
 
-func (r *StickerioRepositoryImpl) ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*buildingQueueItem, error) {
+func (r *StickerioRepository) ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*dbBuildingQueueItem, error) {
 	filtersValues := []interface{}{cityID, lastID, pageSize}
 	const listBuildingQueueItemsQuery = `
 SELECT
@@ -606,10 +621,10 @@ LIMIT $3
 		return nil, fmt.Errorf("listBuildingQueueItemsQuery failed: %w", err)
 	}
 
-	results := make([]*buildingQueueItem, 0, pageSize)
+	results := make([]*dbBuildingQueueItem, 0, pageSize)
 
 	for rows.Next() {
-		result := &buildingQueueItem{}
+		result := &dbBuildingQueueItem{}
 		err := rows.Scan(
 			&result.id,
 			&result.cityID,

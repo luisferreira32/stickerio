@@ -21,10 +21,8 @@ var _ MappedNullable = &V1CityResources{}
 
 // V1CityResources struct for V1CityResources
 type V1CityResources struct {
-	SticksCountBase int64 `json:"sticksCountBase"`
-	SticksCountEpoch int64 `json:"sticksCountEpoch"`
-	CirclesCountBase int64 `json:"circlesCountBase"`
-	CirclesCountEpoch int64 `json:"circlesCountEpoch"`
+	Epoch int64 `json:"epoch"`
+	BaseCount map[string]int64 `json:"baseCount"`
 }
 
 type _V1CityResources V1CityResources
@@ -33,12 +31,10 @@ type _V1CityResources V1CityResources
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1CityResources(sticksCountBase int64, sticksCountEpoch int64, circlesCountBase int64, circlesCountEpoch int64) *V1CityResources {
+func NewV1CityResources(epoch int64, baseCount map[string]int64) *V1CityResources {
 	this := V1CityResources{}
-	this.SticksCountBase = sticksCountBase
-	this.SticksCountEpoch = sticksCountEpoch
-	this.CirclesCountBase = circlesCountBase
-	this.CirclesCountEpoch = circlesCountEpoch
+	this.Epoch = epoch
+	this.BaseCount = baseCount
 	return &this
 }
 
@@ -50,100 +46,52 @@ func NewV1CityResourcesWithDefaults() *V1CityResources {
 	return &this
 }
 
-// GetSticksCountBase returns the SticksCountBase field value
-func (o *V1CityResources) GetSticksCountBase() int64 {
+// GetEpoch returns the Epoch field value
+func (o *V1CityResources) GetEpoch() int64 {
 	if o == nil {
 		var ret int64
 		return ret
 	}
 
-	return o.SticksCountBase
+	return o.Epoch
 }
 
-// GetSticksCountBaseOk returns a tuple with the SticksCountBase field value
+// GetEpochOk returns a tuple with the Epoch field value
 // and a boolean to check if the value has been set.
-func (o *V1CityResources) GetSticksCountBaseOk() (*int64, bool) {
+func (o *V1CityResources) GetEpochOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.SticksCountBase, true
+	return &o.Epoch, true
 }
 
-// SetSticksCountBase sets field value
-func (o *V1CityResources) SetSticksCountBase(v int64) {
-	o.SticksCountBase = v
+// SetEpoch sets field value
+func (o *V1CityResources) SetEpoch(v int64) {
+	o.Epoch = v
 }
 
-// GetSticksCountEpoch returns the SticksCountEpoch field value
-func (o *V1CityResources) GetSticksCountEpoch() int64 {
+// GetBaseCount returns the BaseCount field value
+func (o *V1CityResources) GetBaseCount() map[string]int64 {
 	if o == nil {
-		var ret int64
+		var ret map[string]int64
 		return ret
 	}
 
-	return o.SticksCountEpoch
+	return o.BaseCount
 }
 
-// GetSticksCountEpochOk returns a tuple with the SticksCountEpoch field value
+// GetBaseCountOk returns a tuple with the BaseCount field value
 // and a boolean to check if the value has been set.
-func (o *V1CityResources) GetSticksCountEpochOk() (*int64, bool) {
+func (o *V1CityResources) GetBaseCountOk() (*map[string]int64, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.SticksCountEpoch, true
+	return &o.BaseCount, true
 }
 
-// SetSticksCountEpoch sets field value
-func (o *V1CityResources) SetSticksCountEpoch(v int64) {
-	o.SticksCountEpoch = v
-}
-
-// GetCirclesCountBase returns the CirclesCountBase field value
-func (o *V1CityResources) GetCirclesCountBase() int64 {
-	if o == nil {
-		var ret int64
-		return ret
-	}
-
-	return o.CirclesCountBase
-}
-
-// GetCirclesCountBaseOk returns a tuple with the CirclesCountBase field value
-// and a boolean to check if the value has been set.
-func (o *V1CityResources) GetCirclesCountBaseOk() (*int64, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.CirclesCountBase, true
-}
-
-// SetCirclesCountBase sets field value
-func (o *V1CityResources) SetCirclesCountBase(v int64) {
-	o.CirclesCountBase = v
-}
-
-// GetCirclesCountEpoch returns the CirclesCountEpoch field value
-func (o *V1CityResources) GetCirclesCountEpoch() int64 {
-	if o == nil {
-		var ret int64
-		return ret
-	}
-
-	return o.CirclesCountEpoch
-}
-
-// GetCirclesCountEpochOk returns a tuple with the CirclesCountEpoch field value
-// and a boolean to check if the value has been set.
-func (o *V1CityResources) GetCirclesCountEpochOk() (*int64, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.CirclesCountEpoch, true
-}
-
-// SetCirclesCountEpoch sets field value
-func (o *V1CityResources) SetCirclesCountEpoch(v int64) {
-	o.CirclesCountEpoch = v
+// SetBaseCount sets field value
+func (o *V1CityResources) SetBaseCount(v map[string]int64) {
+	o.BaseCount = v
 }
 
 func (o V1CityResources) MarshalJSON() ([]byte, error) {
@@ -156,10 +104,8 @@ func (o V1CityResources) MarshalJSON() ([]byte, error) {
 
 func (o V1CityResources) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["sticksCountBase"] = o.SticksCountBase
-	toSerialize["sticksCountEpoch"] = o.SticksCountEpoch
-	toSerialize["circlesCountBase"] = o.CirclesCountBase
-	toSerialize["circlesCountEpoch"] = o.CirclesCountEpoch
+	toSerialize["epoch"] = o.Epoch
+	toSerialize["baseCount"] = o.BaseCount
 	return toSerialize, nil
 }
 
@@ -168,10 +114,8 @@ func (o *V1CityResources) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"sticksCountBase",
-		"sticksCountEpoch",
-		"circlesCountBase",
-		"circlesCountEpoch",
+		"epoch",
+		"baseCount",
 	}
 
 	allProperties := make(map[string]interface{})

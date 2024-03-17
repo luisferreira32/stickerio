@@ -6,44 +6,45 @@ import (
 	"sort"
 )
 
-type buildingName string
-type buildingSpecs struct {
-	Multiplier []float64 `json:"multiplier"`
-}
-
-const (
-	mine     buildingName = "mines"
-	barracks buildingName = "barracks"
+type (
+	tMovementID      string
+	tPlayerID        string
+	tCityID          string
+	tEpoch           int64
+	tUnitCount       map[string]int64
+	tResourceCount   map[string]int64
+	tItemID          string
+	tBuildingName    string
+	tUnitName        string
+	tResourceTrickle int64
+	tResourceName    string
 )
 
-type unitName string
+type militaryBuildingSpecs struct {
+	Multiplier []float32          `json:"multiplier"`
+	Units      map[tUnitName]bool `json:"units"`
+}
+
+type economicBuildingSpecs struct {
+	Multiplier []float32              `json:"multiplier"`
+	Resources  map[tResourceName]bool `json:"resources"`
+}
+
 type unitSpecs struct {
 	UnitSpeed              float32 `json:"speed"`
-	UnitProductionSpeedSec int     `json:"production_speed"`
+	UnitProductionSpeedSec int     `json:"productionSpeed"`
 }
 
-const (
-	stickmen  unitName = "stickmen"
-	swordsmen unitName = "swordsmen"
-)
-
-type resourceTrickle int
-type resourceName string
-
-const (
-	sticks  resourceName = "sticks"
-	circles resourceName = "circles"
-)
-
 type gameConfig struct {
-	Buildings        map[buildingName]buildingSpecs
-	Units            map[unitName]unitSpecs
-	ResourceTrickles map[resourceName]resourceTrickle
+	MilitaryBuildings map[tBuildingName]militaryBuildingSpecs `json:"militaryBuildings"`
+	EconomicBuildings map[tBuildingName]economicBuildingSpecs `json:"economicBuildings"`
+	Units             map[tUnitName]unitSpecs                 `json:"units"`
+	ResourceTrickles  map[tResourceName]tResourceTrickle      `json:"resources"`
 }
 
 var (
 	config       gameConfig
-	slowestUnits []unitName
+	slowestUnits []tUnitName
 )
 
 func init() {
@@ -59,7 +60,7 @@ func init() {
 		panic(err)
 	}
 
-	slowestUnits = make([]unitName, 0, len(config.Units))
+	slowestUnits = make([]tUnitName, 0, len(config.Units))
 	for k := range config.Units {
 		slowestUnits = append(slowestUnits, k)
 	}

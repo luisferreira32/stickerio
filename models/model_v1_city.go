@@ -24,7 +24,7 @@ type V1City struct {
 	CityInfo V1CityInfo `json:"cityInfo"`
 	CityBuildings V1CityBuildings `json:"cityBuildings"`
 	CityResources V1CityResources `json:"cityResources"`
-	UnitCount V1UnitCount `json:"unitCount"`
+	UnitCount map[string]int64 `json:"unitCount"`
 }
 
 type _V1City V1City
@@ -33,7 +33,7 @@ type _V1City V1City
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1City(cityInfo V1CityInfo, cityBuildings V1CityBuildings, cityResources V1CityResources, unitCount V1UnitCount) *V1City {
+func NewV1City(cityInfo V1CityInfo, cityBuildings V1CityBuildings, cityResources V1CityResources, unitCount map[string]int64) *V1City {
 	this := V1City{}
 	this.CityInfo = cityInfo
 	this.CityBuildings = cityBuildings
@@ -123,9 +123,9 @@ func (o *V1City) SetCityResources(v V1CityResources) {
 }
 
 // GetUnitCount returns the UnitCount field value
-func (o *V1City) GetUnitCount() V1UnitCount {
+func (o *V1City) GetUnitCount() map[string]int64 {
 	if o == nil {
-		var ret V1UnitCount
+		var ret map[string]int64
 		return ret
 	}
 
@@ -134,7 +134,7 @@ func (o *V1City) GetUnitCount() V1UnitCount {
 
 // GetUnitCountOk returns a tuple with the UnitCount field value
 // and a boolean to check if the value has been set.
-func (o *V1City) GetUnitCountOk() (*V1UnitCount, bool) {
+func (o *V1City) GetUnitCountOk() (*map[string]int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -142,7 +142,7 @@ func (o *V1City) GetUnitCountOk() (*V1UnitCount, bool) {
 }
 
 // SetUnitCount sets field value
-func (o *V1City) SetUnitCount(v V1UnitCount) {
+func (o *V1City) SetUnitCount(v map[string]int64) {
 	o.UnitCount = v
 }
 

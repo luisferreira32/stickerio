@@ -27,8 +27,8 @@ type V1Movement struct {
 	DestinationID string `json:"destinationID"`
 	DepartureEpoch int64 `json:"departureEpoch"`
 	Speed float32 `json:"speed"`
-	UnitCount V1UnitCount `json:"unitCount"`
-	ResourceCount V1ResourceCount `json:"resourceCount"`
+	UnitCount map[string]int64 `json:"unitCount"`
+	ResourceCount map[string]int64 `json:"resourceCount"`
 }
 
 type _V1Movement V1Movement
@@ -37,7 +37,7 @@ type _V1Movement V1Movement
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewV1Movement(id string, playerID string, originID string, destinationID string, departureEpoch int64, speed float32, unitCount V1UnitCount, resourceCount V1ResourceCount) *V1Movement {
+func NewV1Movement(id string, playerID string, originID string, destinationID string, departureEpoch int64, speed float32, unitCount map[string]int64, resourceCount map[string]int64) *V1Movement {
 	this := V1Movement{}
 	this.Id = id
 	this.PlayerID = playerID
@@ -203,9 +203,9 @@ func (o *V1Movement) SetSpeed(v float32) {
 }
 
 // GetUnitCount returns the UnitCount field value
-func (o *V1Movement) GetUnitCount() V1UnitCount {
+func (o *V1Movement) GetUnitCount() map[string]int64 {
 	if o == nil {
-		var ret V1UnitCount
+		var ret map[string]int64
 		return ret
 	}
 
@@ -214,7 +214,7 @@ func (o *V1Movement) GetUnitCount() V1UnitCount {
 
 // GetUnitCountOk returns a tuple with the UnitCount field value
 // and a boolean to check if the value has been set.
-func (o *V1Movement) GetUnitCountOk() (*V1UnitCount, bool) {
+func (o *V1Movement) GetUnitCountOk() (*map[string]int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -222,14 +222,14 @@ func (o *V1Movement) GetUnitCountOk() (*V1UnitCount, bool) {
 }
 
 // SetUnitCount sets field value
-func (o *V1Movement) SetUnitCount(v V1UnitCount) {
+func (o *V1Movement) SetUnitCount(v map[string]int64) {
 	o.UnitCount = v
 }
 
 // GetResourceCount returns the ResourceCount field value
-func (o *V1Movement) GetResourceCount() V1ResourceCount {
+func (o *V1Movement) GetResourceCount() map[string]int64 {
 	if o == nil {
-		var ret V1ResourceCount
+		var ret map[string]int64
 		return ret
 	}
 
@@ -238,7 +238,7 @@ func (o *V1Movement) GetResourceCount() V1ResourceCount {
 
 // GetResourceCountOk returns a tuple with the ResourceCount field value
 // and a boolean to check if the value has been set.
-func (o *V1Movement) GetResourceCountOk() (*V1ResourceCount, bool) {
+func (o *V1Movement) GetResourceCountOk() (*map[string]int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -246,7 +246,7 @@ func (o *V1Movement) GetResourceCountOk() (*V1ResourceCount, bool) {
 }
 
 // SetResourceCount sets field value
-func (o *V1Movement) SetResourceCount(v V1ResourceCount) {
+func (o *V1Movement) SetResourceCount(v map[string]int64) {
 	o.ResourceCount = v
 }
 
