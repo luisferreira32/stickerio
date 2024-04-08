@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -516,7 +517,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 
 	switch {
 	case destinationID == "":
-		calculateForaging(arrivalMovement.UnitCount, arrivalMovement.ResourceCount)
+		resourceCount := calculateForaging(arrivalMovement.UnitCount, arrivalMovement.ResourceCount)
 		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
 
 		speed := getMovementSpeed(arrivalMovement.UnitCount)
@@ -544,7 +545,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 			DestinationX:  originCity.locationX,
 			DestinationY:  originCity.locationY,
 			UnitCount:     arrivalMovement.UnitCount,
-			ResourceCount: arrivalMovement.ResourceCount,
+			ResourceCount: resourceCount,
 		}
 		payload, err := json.Marshal(returnMovement)
 		if err != nil {
@@ -971,7 +972,30 @@ func dist(x1, y1, x2, y2 int32) float64 {
 	return math.Sqrt(float64(squareDist))
 }
 
-func calculateForaging(units tUnitCount, initialLoad tResourceCount) {} // TODO
+func calculateForaging(units tUnitCount, initialLoad tResourceCount) tResourceCount {
+	// TODO ensure this does not overflow or avoid int64 for resource calculations (re-type it)
+	var (
+		freeCarryCapacity int64
+	)
+	for unitType, unitCount := range units {
+		freeCarryCapacity += unitCount * readOnlyConfig.Units[tUnitName(unitType)].CarryCapacity
+	}
+	for _, resourceCount := range initialLoad {
+		freeCarryCapacity -= resourceCount
+	}
+	if freeCarryCapacity < 1 {
+		return initialLoad
+	}
+
+	foragableResources := int64(rand.Float64() * readOnlyConfig.ForagingCoefficient * float64(freeCarryCapacity))
+	carriedResources := make(tResourceCount)
+	for resourceName, resourceCount := range initialLoad { // FIXME: maps are not ordered, but is it random enough?
+		foragedResource := rand.Int63n(foragableResources)
+		carriedResources[resourceName] = resourceCount + foragedResource
+		foragableResources -= foragedResource
+	}
+	return carriedResources
+}
 
 func calculateBattle(attackers, defenders tUnitCount) {} // TODO
 

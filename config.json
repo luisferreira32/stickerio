@@ -11,7 +11,8 @@
             "stats": {
                 "pierce": 10,
                 "slash": 10
-            }
+            },
+            "carryCapacity": 10
         },
         "swordsmen": {
             "speed": 1.2,
@@ -23,7 +24,8 @@
             "stats": {
                 "pierce": 15,
                 "slash": 5
-            }
+            },
+            "carryCapacity": 10
         },
         "god": {
             "speed": 1000,

@@ -37,13 +37,15 @@ type unitSpecs struct {
 	UnitSpeed              float64        `json:"speed"`
 	UnitProductionSpeedSec int64          `json:"productionSpeed"`
 	UnitCost               tResourceCount `json:"cost"`
-	Stats                  tUnitStats     `json:"stats"`
+	CombatStats            tUnitStats     `json:"stats"`
+	CarryCapacity          int64          `json:"carryCapacity"`
 }
 
 type gameConfig struct {
-	Buildings        map[tBuildingName]buildingSpecs    `json:"buildings"`
-	Units            map[tUnitName]unitSpecs            `json:"units"`
-	ResourceTrickles map[tResourceName]tResourceTrickle `json:"resources"`
+	Buildings           map[tBuildingName]buildingSpecs    `json:"buildings"`
+	Units               map[tUnitName]unitSpecs            `json:"units"`
+	ResourceTrickles    map[tResourceName]tResourceTrickle `json:"resources"`
+	ForagingCoefficient float64
 }
 
 var (
