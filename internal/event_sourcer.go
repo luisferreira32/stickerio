@@ -517,7 +517,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 
 	switch {
 	case destinationID == "":
-		resourceCount := calculateForaging(arrivalMovement.UnitCount, arrivalMovement.ResourceCount)
+		calculateForaging(arrivalMovement.UnitCount, arrivalMovement.ResourceCount)
 		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
 
 		speed := getMovementSpeed(arrivalMovement.UnitCount)
@@ -545,7 +545,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 			DestinationX:  originCity.locationX,
 			DestinationY:  originCity.locationY,
 			UnitCount:     arrivalMovement.UnitCount,
-			ResourceCount: resourceCount,
+			ResourceCount: arrivalMovement.ResourceCount,
 		}
 		payload, err := json.Marshal(returnMovement)
 		if err != nil {
@@ -575,7 +575,12 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 
 	case arrivalMovement.PlayerID != tPlayerID(s.inMemoryState.cityList[destinationID].playerID):
 		// TODO: future aliances possibility and treat this as a permanent reinforcement instead of an attack (?)
-		calculateBattle(arrivalMovement.UnitCount, s.inMemoryState.cityList[destinationID].unitCount)
+		calculateBattle(
+			e.epoch,
+			arrivalMovement.UnitCount,
+			arrivalMovement.ResourceCount,
+			s.inMemoryState.cityList[destinationID],
+		)
 		attackersSurvived := false
 		for _, survived := range arrivalMovement.UnitCount {
 			if survived == 0 {
@@ -588,13 +593,6 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 		if !attackersSurvived {
 			return nil
 		}
-
-		calculatePlunder(
-			arrivalMovement.UnitCount,
-			s.inMemoryState.cityList[destinationID].unitCount,
-			arrivalMovement.ResourceCount,
-			nil, // TODO: calculate plunder and re-calc the city view for the one who was attacked
-		)
 
 		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
 		speed := getMovementSpeed(arrivalMovement.UnitCount)
@@ -650,7 +648,66 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 }
 
 func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event) error {
-	// TODO
+	// parsing
+	returnMovement := returnMovementEvent{}
+	err := json.Unmarshal([]byte(e.payload), &returnMovement)
+	if err != nil {
+		return err
+	}
+
+	// validation and event calculations
+	destinationCity := s.inMemoryState.getCityByLocation(returnMovement.DestinationX, returnMovement.DestinationY)
+	destinationID := tCityID(destinationCity.id)
+
+	switch {
+	case destinationCity == nil:
+		// city where the units left from no longer exists... everything in movement will disappear
+		delete(s.inMemoryState.movementList, returnMovement.MovementID)
+	case destinationCity.playerID != string(returnMovement.PlayerID):
+		// the city was captured by another player, everything is lost to avoid an eternal pendulum of a huge
+		// army
+		// TODO: don't do this when it is possible to conquer a city
+		delete(s.inMemoryState.movementList, returnMovement.MovementID)
+	default:
+		s.toUpsert.cities[destinationID] = struct{}{} // upsert returned city
+		originCity := s.inMemoryState.cityList[returnMovement.OriginID]
+		speed := getMovementSpeed(returnMovement.UnitCount)
+		distance := dist(
+			returnMovement.DestinationY,
+			returnMovement.DestinationY,
+			originCity.locationX,
+			originCity.locationY,
+		)
+		travelDurationSec := int64(distance / speed)
+
+		// insert chain events
+		arrival := &arrivalMovementEvent{
+			MovementID:    returnMovement.MovementID,
+			PlayerID:      returnMovement.PlayerID,
+			OriginID:      returnMovement.OriginID,
+			DestinationID: returnMovement.DestinationID,
+			DestinationX:  returnMovement.DestinationX,
+			DestinationY:  returnMovement.DestinationY,
+			UnitCount:     returnMovement.UnitCount,
+			ResourceCount: returnMovement.ResourceCount,
+		}
+		payload, err := json.Marshal(arrival)
+		if err != nil {
+			return err
+		}
+		chainEvent := &event{
+			id:      uuid.NewString(),
+			name:    arrivalMovementEventName,
+			epoch:   int64(e.epoch) + travelDurationSec,
+			payload: string(payload),
+		}
+		err = s.repository.InsertEvent(ctx, chainEvent)
+		if err != nil {
+			return err
+		}
+	}
+	s.toUpsert.movements[returnMovement.MovementID] = struct{}{}
+
 	return nil
 }
 
@@ -972,7 +1029,7 @@ func dist(x1, y1, x2, y2 int32) float64 {
 	return math.Sqrt(float64(squareDist))
 }
 
-func calculateForaging(units tUnitCount, initialLoad tResourceCount) tResourceCount {
+func calculateForaging(units tUnitCount, initialLoad tResourceCount) {
 	// TODO ensure this does not overflow or avoid int64 for resource calculations (re-type it)
 	var (
 		freeCarryCapacity int64
@@ -984,19 +1041,117 @@ func calculateForaging(units tUnitCount, initialLoad tResourceCount) tResourceCo
 		freeCarryCapacity -= resourceCount
 	}
 	if freeCarryCapacity < 1 {
-		return initialLoad
+		return
 	}
 
 	foragableResources := int64(rand.Float64() * readOnlyConfig.ForagingCoefficient * float64(freeCarryCapacity))
-	carriedResources := make(tResourceCount)
 	for resourceName, resourceCount := range initialLoad { // FIXME: maps are not ordered, but is it random enough?
 		foragedResource := rand.Int63n(foragableResources)
-		carriedResources[resourceName] = resourceCount + foragedResource
+		initialLoad[resourceName] = resourceCount + foragedResource
 		foragableResources -= foragedResource
 	}
-	return carriedResources
 }
 
-func calculateBattle(attackers, defenders tUnitCount) {} // TODO
+func calculateBattle(epoch int64, attackers tUnitCount, initialLoad tResourceCount, defenderCity *city) {
+	// TODO: a more balanced battle system (research how it is usually done)
+	// and use GPU for matrix calculations maybe?
+	var (
+		swing          = 0.0
+		swingMax int64 = 0
+		swingMin int64 = 0
+	)
 
-func calculatePlunder(attackers, defenders tUnitCount, initialLoad, cityResources tResourceCount) {} // TODO
+	attackerStats := make(tUnitStats)
+	for unitName, unitCount := range attackers {
+		for statName, statValue := range readOnlyConfig.Units[tUnitName(unitName)].CombatStats {
+			attackerStats[statName] += statValue * unitCount
+			swingMax += statValue * unitCount
+		}
+	}
+	defendersStats := make(tUnitStats)
+	for unitName, unitCount := range defenderCity.unitCount {
+		for statName, statValue := range readOnlyConfig.Units[tUnitName(unitName)].CombatStats {
+			defendersStats[statName] += statValue * unitCount
+			swingMin -= statValue * unitCount
+		}
+	}
+
+	for statName := range attackerStats {
+		swing += float64(attackerStats[statName])*(readOnlyConfig.CombatEfficiency+(1-readOnlyConfig.CombatEfficiency)*rand.Float64()) - float64(defendersStats[statName])*(readOnlyConfig.CombatEfficiency+(1-readOnlyConfig.CombatEfficiency)*rand.Float64())
+	}
+
+	normalizedSwing := 0.5 * swing / float64(swingMax-swingMin)
+	switch {
+	case swingMin == 0:
+		// no units lost, due to the fact that there were no defenders
+	case swingMax == 0 && swingMin < 0:
+		// no combatant units went attacking... so defenders just kill them
+		for unitName := range attackers {
+			attackers[unitName] = 0
+		}
+	default:
+		for unitName, unitCount := range defenderCity.unitCount {
+			defenderCity.unitCount[unitName] = int64(float64(unitCount) * (.5 - normalizedSwing))
+		}
+		for unitName, unitCount := range attackers {
+			attackers[unitName] = int64(float64(unitCount) * (.5 + normalizedSwing))
+		}
+	}
+	var (
+		attackersFreeCapacity int64
+	)
+	for unitType, unitCount := range attackers {
+		attackersFreeCapacity += unitCount * readOnlyConfig.Units[tUnitName(unitType)].CarryCapacity
+	}
+	for _, resourceCount := range initialLoad {
+		attackersFreeCapacity -= resourceCount
+	}
+
+	if attackersFreeCapacity < 0 {
+		// edge case: attackers bring resources to the defenders! inverted plunder
+		resourcesToLeave := -attackersFreeCapacity / int64(len(initialLoad))
+		negativeCost := make(tResourceCount)
+		for resourceName, resourceCount := range initialLoad {
+			initialLoad[resourceName] = resourceCount - resourcesToLeave
+			negativeCost[resourceName] = -resourcesToLeave
+		}
+		reCalculateResources(epoch, negativeCost, defenderCity)
+		return
+	}
+
+	// TODO: do not utilize this hack to make it re-calculate the epoch and current base
+	reCalculateResources(epoch, make(tResourceCount), defenderCity)
+
+	if attackersFreeCapacity > 0 {
+		resourcesToPlunderPerType := attackersFreeCapacity / int64(len(defenderCity.resourceBase))
+		for resourceName, resourceCount := range defenderCity.resourceBase {
+			if resourceCount >= resourcesToPlunderPerType {
+				defenderCity.resourceBase[resourceName] -= resourcesToPlunderPerType
+				initialLoad[resourceName] += resourcesToPlunderPerType
+				attackersFreeCapacity -= resourcesToPlunderPerType
+			} else {
+				defenderCity.resourceBase[resourceName] -= resourceCount
+				initialLoad[resourceName] += resourceCount
+				attackersFreeCapacity -= resourceCount
+			}
+		}
+		// NOTE: do not rely on randomness of map key access for this second round ?
+		if attackersFreeCapacity > 0 {
+			for resourceName, resourceCount := range defenderCity.resourceBase {
+				if resourceCount == 0 || attackersFreeCapacity == 0 {
+					continue
+				}
+				if resourceCount >= attackersFreeCapacity {
+					defenderCity.resourceBase[resourceName] -= attackersFreeCapacity
+					initialLoad[resourceName] += attackersFreeCapacity
+					attackersFreeCapacity -= attackersFreeCapacity
+				} else {
+					defenderCity.resourceBase[resourceName] -= resourceCount
+					initialLoad[resourceName] += resourceCount
+					attackersFreeCapacity -= resourceCount
+				}
+			}
+		}
+
+	}
+}
