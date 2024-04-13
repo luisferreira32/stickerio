@@ -12,8 +12,8 @@ Here lies the _detailed_ roadmap of Stickerio. If you are interested in the proj
 - [x] Migrate API configuration to a more standardized tool (e.g., proto / OAS);
 - [x] Better separate business logic from API conversion;
 - [ ] Experiment with generics for the repetivive code with different types;
-- [ ] Implement event insertion API endpoints (movement, upgrades, training, etc.);
-- [ ] Implement event sourcing/handling;
+- [x] Implement event insertion API endpoints (movement, upgrades, training, etc.);
+- [x] Implement event sourcing/handling;
 - [ ] Implement CLI to obtain the views;
 - [ ] Implement CLI to submit events;
 - [ ] Balance game configurations for a decent playing experience;

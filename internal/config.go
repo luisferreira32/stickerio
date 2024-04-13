@@ -2,6 +2,7 @@ package internal
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
 	"sort"
 )
@@ -18,6 +19,7 @@ type (
 	tUnitName        string
 	tResourceTrickle int64
 	tResourceName    string
+	tUnitStats       map[string]int64
 )
 
 // NOTE: we take advantage of golang's defaults to false for units/resources
@@ -36,12 +38,16 @@ type unitSpecs struct {
 	UnitSpeed              float64        `json:"speed"`
 	UnitProductionSpeedSec int64          `json:"productionSpeed"`
 	UnitCost               tResourceCount `json:"cost"`
+	CombatStats            tUnitStats     `json:"stats"`
+	CarryCapacity          int64          `json:"carryCapacity"`
 }
 
 type gameConfig struct {
-	Buildings        map[tBuildingName]buildingSpecs    `json:"buildings"`
-	Units            map[tUnitName]unitSpecs            `json:"units"`
-	ResourceTrickles map[tResourceName]tResourceTrickle `json:"resources"`
+	Buildings           map[tBuildingName]buildingSpecs    `json:"buildings"`
+	Units               map[tUnitName]unitSpecs            `json:"units"`
+	ResourceTrickles    map[tResourceName]tResourceTrickle `json:"resources"`
+	ForagingCoefficient float64
+	CombatEfficiency    float64
 }
 
 var (
@@ -69,6 +75,7 @@ func init() {
 	// * costs are done with existing resources
 	// * check if buildings define training multipliers if they train units
 	// * check if buildings define trickle multipliers if they produce resources
+	// * ensure all units have a value for each stat type (even if zero)
 
 	// NOTE: setup some pre-calculations for easier game logic
 
@@ -100,4 +107,7 @@ func init() {
 			readOnlyTrainingMultipliers[unitKey] = append(readOnlyTrainingMultipliers[unitKey], buildingKey)
 		}
 	}
+
+	// TODO efficiency range can come from config + future bonuses
+	readOnlyConfig.CombatEfficiency = rand.Float64()*0.3 + 0.7
 }
