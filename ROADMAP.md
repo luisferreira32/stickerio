@@ -11,11 +11,13 @@ Here lies the _detailed_ roadmap of Stickerio. If you are interested in the proj
 - [x] Implement view API endpoints;
 - [x] Migrate API configuration to a more standardized tool (e.g., proto / OAS);
 - [x] Better separate business logic from API conversion;
-- [ ] Experiment with generics for the repetivive code with different types;
+- [x] Experiment with generics for the repetivive code with different types;
 - [x] Implement event insertion API endpoints (movement, upgrades, training, etc.);
 - [x] Implement event sourcing/handling;
+- [ ] Introduce some API e2e testing;
 - [ ] Implement CLI to obtain the views;
 - [ ] Implement CLI to submit events;
+- [ ] Allow setting the type of movement the troops should do (attack vs. reinforce/relocate);
 - [ ] Balance game configurations for a decent playing experience;
 
 ### Documentation

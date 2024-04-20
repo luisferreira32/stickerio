@@ -31,6 +31,8 @@ func (s QueryParameterKey) String() string { return string(s) }
 const (
 	APIVersion = "v1"
 
+	AuthenticationHeaderKey = "Authentication"
+
 	CityID     PathParameterKey = "cityid"
 	ItemID     PathParameterKey = "itemid"
 	MovementID PathParameterKey = "movementid"
@@ -45,7 +47,8 @@ const (
 
 func WithAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		playerID := "foo" // TODO: validate token and add info to context
+		// TODO: validate token and add info to context
+		playerID := r.Header[AuthenticationHeaderKey][0]
 		if playerID == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte("unauthorized"))

@@ -139,6 +139,10 @@ func (s *EventSourcer) processEvent(ctx context.Context, e *event) error {
 	s.inMemoryStateLock.Lock()
 	defer s.inMemoryStateLock.Unlock()
 
+	if e.epoch > tSec(time.Now().Unix()) {
+		return fmt.Errorf("future event cannot be processed")
+	}
+
 	var (
 		err error
 	)
