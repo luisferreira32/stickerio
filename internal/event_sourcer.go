@@ -33,116 +33,6 @@ var (
 	errPreConditionFailed = fmt.Errorf("pre-condition failed")
 )
 
-// Inserted when a player starts a movement.
-// Its processing generates an arrivalMovementEvent at a later epoch (calculated based on distance between cities / speed).
-type startMovementEvent struct {
-	MovementID     tMovementID    `json:"movementID"`
-	PlayerID       tPlayerID      `json:"playerID"`
-	OriginID       tCityID        `json:"originID"`
-	DestinationID  tCityID        `json:"destinationID"`
-	DestinationX   int32          `json:"destinationX"`
-	DestinationY   int32          `json:"destinationY"`
-	DepartureEpoch tEpoch         `json:"departureEpoch"`
-	UnitCount      tUnitCount     `json:"unitCount"`
-	ResourceCount  tResourceCount `json:"resourceCount"`
-}
-
-// Inserted when a startMovementEvent is processed.
-// The arrival processing does the options:
-// * reinforce if it's from the same player;
-// * battle if it's from separate player and insert returnMovementEvent if troops survive;
-// * forage if it's abandoned and insert returnMovementEvent;
-// * create a new city if the unit type sent has the capability for settling;
-type arrivalMovementEvent struct {
-	MovementID    tMovementID    `json:"movementID"`
-	PlayerID      tPlayerID      `json:"playerID"`
-	OriginID      tCityID        `json:"originID"`
-	DestinationID tCityID        `json:"destinationID"`
-	DestinationX  int32          `json:"destinationX"`
-	DestinationY  int32          `json:"destinationY"`
-	UnitCount     tUnitCount     `json:"unitCount"`
-	ResourceCount tResourceCount `json:"resourceCount"`
-}
-
-// Inserted when a startMovementEvent is processed.
-// Processing will simply reinforce the city where they return to with units/resources.
-// If the units return to a city that was conquered - since they would not really expect
-// that, they are unfortunately massacred and everything is forever lost.
-type returnMovementEvent struct {
-	MovementID    tMovementID    `json:"movementID"`
-	PlayerID      tPlayerID      `json:"playerID"`
-	OriginID      tCityID        `json:"originID"`
-	DestinationID tCityID        `json:"destinationID"`
-	DestinationX  int32          `json:"destinationX"`
-	DestinationY  int32          `json:"destinationY"`
-	UnitCount     tUnitCount     `json:"unitCount"`
-	ResourceCount tResourceCount `json:"resourceCount"`
-}
-
-// Inserted when a request to queue a unit is done.
-// If the resources of the city are enough an event is set for the future
-// to create the units.
-type queueUnitEvent struct {
-	UnitQueueItemID tItemID   `json:"unitQueueItemID"`
-	CityID          tCityID   `json:"cityID"`
-	PlayerID        tPlayerID `json:"playerID"`
-	UnitCount       int64     `json:"unitCount"`
-	UnitType        tUnitName `json:"unitType"`
-}
-
-// Inserted when a queueUnitEvent is processed.
-// If the cityID still belongs to the original player, new units will be added to the city.
-// If the city was conquered by a different player, nothing will happen.
-type createUnitEvent struct {
-	UnitQueueItemID tItemID   `json:"unitQueueItemID"`
-	CityID          tCityID   `json:"cityID"`
-	PlayerID        tPlayerID `json:"playerID"`
-	UnitCount       int64     `json:"unitCount"`
-	UnitType        tUnitName `json:"unitType"`
-}
-
-// Inserted when a request to queue a building upgrade is done.
-type queueBuildingEvent struct {
-	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
-	CityID              tCityID       `json:"cityID"`
-	PlayerID            tPlayerID     `json:"playerID"`
-	TargetLevel         int64         `json:"targetLevel"`
-	TargetBuilding      tBuildingName `json:"targetBuilding"`
-}
-
-// Inserted when a queueBuildingEvent is processed.
-// If the cityID still belongs to the original player, the building is upgraded.
-// If the city was conquered by a different player, nothing will happen.
-type upgradeBuildingEvent struct {
-	BuildingQueueItemID tItemID       `json:"buildingQueueItemID"`
-	CityID              tCityID       `json:"cityID"`
-	PlayerID            tPlayerID     `json:"playerID"`
-	TargetLevel         int64         `json:"targetLevel"`
-	TargetBuilding      tBuildingName `json:"targetBuilding"`
-}
-
-// Inserted when a city is founded.
-// The city is created and all units/resources are added to the newly created city.
-// Note that this event might only be created for available locations, an arrival event
-// might also generate a createCityEvent if the conditions are met.
-type createCityEvent struct {
-	CityID        tCityID        `json:"cityID"`
-	Name          string         `json:"name"`
-	PlayerID      tPlayerID      `json:"playerID"`
-	LocationX     int32          `json:"locationX"`
-	LocationY     int32          `json:"locationY"`
-	ResourceCount tResourceCount `json:"resourceCount"`
-	UnitCount     tUnitCount     `json:"unitCount"`
-}
-
-// Inserted when a city is abandoned.
-// Its processing will effectively delete the city, vanquish the resources,
-// raze the buildings, and annihilate all units residing the city.
-type deleteCityEvent struct {
-	CityID   tCityID   `json:"cityID"`
-	PlayerID tPlayerID `json:"playerID"`
-}
-
 type eventsRepository interface {
 	InsertEvent(ctx context.Context, e *event) error
 	ListEvents(ctx context.Context, untilEpoch int64) ([]*event, error)
@@ -161,8 +51,8 @@ type eventsRepository interface {
 type upsertIDs struct {
 	cities    map[tCityID]struct{}
 	movements map[tMovementID]struct{}
-	unitQ     map[tCityID]map[tItemID]struct{}
-	buildingQ map[tCityID]map[tItemID]struct{}
+	unitQ     map[tCityID]map[tUnitQueueItemID]struct{}
+	buildingQ map[tCityID]map[tBuildingQueueItemID]struct{}
 }
 
 // The EventSourcer is the magic of this game.
@@ -206,8 +96,8 @@ func NewEventSourcer(repository eventsRepository) *EventSourcer {
 		toUpsert: upsertIDs{
 			cities:    make(map[tCityID]struct{}),
 			movements: make(map[tMovementID]struct{}),
-			unitQ:     make(map[tCityID]map[tItemID]struct{}),
-			buildingQ: make(map[tCityID]map[tItemID]struct{}),
+			unitQ:     make(map[tCityID]map[tUnitQueueItemID]struct{}),
+			buildingQ: make(map[tCityID]map[tBuildingQueueItemID]struct{}),
 		},
 	}
 }
@@ -417,12 +307,13 @@ func (s *EventSourcer) upsertViews(ctx context.Context) error {
 	s.toUpsert = upsertIDs{
 		cities:    make(map[tCityID]struct{}),
 		movements: make(map[tMovementID]struct{}),
-		unitQ:     make(map[tCityID]map[tItemID]struct{}),
-		buildingQ: make(map[tCityID]map[tItemID]struct{}),
+		unitQ:     make(map[tCityID]map[tUnitQueueItemID]struct{}),
+		buildingQ: make(map[tCityID]map[tBuildingQueueItemID]struct{}),
 	}
 	return nil
 }
 
+// Processing generates an arrivalMovementEvent at a later epoch (calculated based on distance between cities / speed).
 func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) error {
 	// parsing
 	startMovement := startMovementEvent{}
@@ -432,28 +323,38 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	if s.inMemoryState.cityList[startMovement.OriginID].playerID != string(startMovement.PlayerID) {
+	if s.inMemoryState.cityList[startMovement.OriginID].playerID != startMovement.PlayerID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
 	if startMovement.OriginID == startMovement.DestinationID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot move to the same city")
 	}
-	err = reCalculateResources(int64(startMovement.DepartureEpoch), startMovement.ResourceCount, s.inMemoryState.cityList[startMovement.OriginID])
+	err = reCityCalculateResources(startMovement.DepartureEpoch, startMovement.ResourceCount, s.inMemoryState.cityList[startMovement.OriginID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
-	err = reCalculateUnits(startMovement.UnitCount, s.inMemoryState.cityList[startMovement.OriginID])
-	if err != nil {
-		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
+
+	insufficientUnits := ""
+	for unitName, unitCount := range startMovement.UnitCount {
+		if s.inMemoryState.cityList[startMovement.OriginID].unitCount[unitName] > unitCount {
+			continue
+		}
+		insufficientUnits += fmt.Sprintf("missing %s units", unitName)
 	}
-	speed := getMovementSpeed(startMovement.UnitCount)
-	distance := dist(
+	if insufficientUnits != "" {
+		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, insufficientUnits)
+	}
+	for unitName, unitCount := range startMovement.UnitCount {
+		s.inMemoryState.cityList[startMovement.OriginID].unitCount[unitName] -= unitCount
+	}
+	speed := getGroupMovementSpeed(startMovement.UnitCount)
+	travelDurationSec := travelTime(
 		s.inMemoryState.cityList[startMovement.OriginID].locationX,
 		s.inMemoryState.cityList[startMovement.OriginID].locationY,
 		startMovement.DestinationX,
 		startMovement.DestinationY,
+		speed,
 	)
-	travelDurationSec := int64(distance / speed)
 
 	// insert chain events
 	arrival := &arrivalMovementEvent{
@@ -473,7 +374,7 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	chainEvent := &event{
 		id:      uuid.NewString(),
 		name:    arrivalMovementEventName,
-		epoch:   int64(startMovement.DepartureEpoch) + travelDurationSec,
+		epoch:   startMovement.DepartureEpoch + travelDurationSec,
 		payload: string(payload),
 	}
 	err = s.repository.InsertEvent(ctx, chainEvent)
@@ -483,13 +384,13 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 
 	// upsert cached table and signal future view table upsert
 	m := &movement{
-		id:             string(startMovement.MovementID),
-		playerID:       string(startMovement.PlayerID),
-		originID:       string(startMovement.OriginID),
-		destinationID:  string(startMovement.DestinationID),
+		id:             startMovement.MovementID,
+		playerID:       startMovement.PlayerID,
+		originID:       startMovement.OriginID,
+		destinationID:  startMovement.DestinationID,
 		destinationX:   startMovement.DestinationX,
 		destinationY:   startMovement.DestinationY,
-		departureEpoch: int64(startMovement.DepartureEpoch),
+		departureEpoch: startMovement.DepartureEpoch,
 		speed:          speed,
 		resourceCount:  startMovement.ResourceCount,
 		unitCount:      startMovement.UnitCount,
@@ -501,6 +402,11 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 	return nil
 }
 
+// The arrival processing does the options:
+// * reinforce if it's from the same player;
+// * battle if it's from separate player and insert returnMovementEvent if troops survive;
+// * forage if it's abandoned and insert returnMovementEvent;
+// * create a new city if the unit type sent has the capability for settling;
 func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event) error {
 	// parsing
 	arrivalMovement := arrivalMovementEvent{}
@@ -517,20 +423,39 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 
 	switch {
 	case destinationID == "":
-		calculateForaging(arrivalMovement.UnitCount, arrivalMovement.ResourceCount)
+		// TODO ensure this does not overflow or avoid int64 for resource calculations (re-type it)
+		var (
+			freeCarryCapacity tResourceCount
+		)
+		for unitType, unitCount := range arrivalMovement.UnitCount {
+			freeCarryCapacity += tResourceCount(unitCount) * cfg.Units[tUnitName(unitType)].CarryCapacity
+		}
+		for _, resourceCount := range arrivalMovement.ResourceCount {
+			freeCarryCapacity -= resourceCount
+		}
+		if freeCarryCapacity > 1 {
+			foragableResources := tResourceCount(rand.Float64() * cfg.ForagingCoefficient * float64(freeCarryCapacity))
+			// FIXME: maps are not ordered, but is it random enough?
+			for resourceName, resourceCount := range arrivalMovement.ResourceCount {
+				foragedResource := tResourceCount(rand.Int63n(int64(foragableResources)))
+				arrivalMovement.ResourceCount[resourceName] = resourceCount + foragedResource
+				foragableResources -= foragedResource
+			}
+		}
+
 		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
 
-		speed := getMovementSpeed(arrivalMovement.UnitCount)
-		distance := dist(
+		speed := getGroupMovementSpeed(arrivalMovement.UnitCount)
+		travelDurationSec := travelTime(
 			arrivalMovement.DestinationY,
 			arrivalMovement.DestinationY,
 			originCity.locationX,
 			originCity.locationY,
+			speed,
 		)
-		travelDurationSec := int64(distance / speed)
 
-		s.inMemoryState.movementList[arrivalMovement.MovementID].originID = string(destinationID)
-		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationID = string(arrivalMovement.OriginID)
+		s.inMemoryState.movementList[arrivalMovement.MovementID].originID = destinationID
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationID = arrivalMovement.OriginID
 		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationX = originCity.locationX
 		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationY = originCity.locationY
 		s.inMemoryState.movementList[arrivalMovement.MovementID].resourceCount = arrivalMovement.ResourceCount
@@ -575,37 +500,131 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 
 	case arrivalMovement.PlayerID != tPlayerID(s.inMemoryState.cityList[destinationID].playerID):
 		// TODO: future aliances possibility and treat this as a permanent reinforcement instead of an attack (?)
-		calculateBattle(
-			e.epoch,
-			arrivalMovement.UnitCount,
-			arrivalMovement.ResourceCount,
-			s.inMemoryState.cityList[destinationID],
+
+		// TODO: a more balanced battle system (research how it is usually done)
+		// and use GPU for matrix calculations maybe?
+		var (
+			swing                       = 0.0
+			swingMax     tUnitStatPower = 0
+			swingMin     tUnitStatPower = 0
+			epoch                       = e.epoch
+			attackers                   = arrivalMovement.UnitCount
+			initialLoad                 = arrivalMovement.ResourceCount
+			defenderCity                = s.inMemoryState.cityList[destinationID]
 		)
-		attackersSurvived := false
-		for _, survived := range arrivalMovement.UnitCount {
-			if survived == 0 {
-				continue
+
+		attackerStats := make(map[tUnitStatName]tUnitStatPower)
+		for unitName, unitCount := range attackers {
+			for statName, statValue := range cfg.Units[tUnitName(unitName)].CombatStats {
+				attackerStats[statName] += statValue * tUnitStatPower(unitCount)
+				swingMax += statValue * tUnitStatPower(unitCount)
 			}
-			attackersSurvived = true
+		}
+		defendersStats := make(map[tUnitStatName]tUnitStatPower)
+		for unitName, unitCount := range defenderCity.unitCount {
+			for statName, statValue := range cfg.Units[tUnitName(unitName)].CombatStats {
+				defendersStats[statName] += statValue * tUnitStatPower(unitCount)
+				swingMin -= statValue * tUnitStatPower(unitCount)
+			}
 		}
 
+		for statName := range attackerStats {
+			swing += float64(attackerStats[statName])*(cfg.CombatEfficiency+(1-cfg.CombatEfficiency)*rand.Float64()) - float64(defendersStats[statName])*(cfg.CombatEfficiency+(1-cfg.CombatEfficiency)*rand.Float64())
+		}
+
+		normalizedSwing := 0.5 * swing / float64(swingMax-swingMin)
+		switch {
+		case swingMin == 0:
+			// no units lost, due to the fact that there were no defenders
+		case swingMax == 0 && swingMin < 0:
+			// no combatant units went attacking... so defenders just kill them
+			for unitName := range attackers {
+				attackers[unitName] = 0
+			}
+		default:
+			for unitName, unitCount := range defenderCity.unitCount {
+				defenderCity.unitCount[unitName] = tUnitCount(float64(unitCount) * (.5 - normalizedSwing))
+			}
+			for unitName, unitCount := range attackers {
+				attackers[unitName] = tUnitCount(float64(unitCount) * (.5 + normalizedSwing))
+			}
+		}
+		var (
+			attackersFreeCapacity tResourceCount
+			liveAttackers         bool
+		)
+		for unitType, unitCount := range attackers {
+			attackersFreeCapacity += tResourceCount(unitCount) * cfg.Units[tUnitName(unitType)].CarryCapacity
+			if unitCount == 0 {
+				continue
+			}
+			liveAttackers = true
+		}
 		s.toUpsert.cities[destinationID] = struct{}{} // upsert attacked city regardless
-		if !attackersSurvived {
+		if !liveAttackers {
 			return nil
 		}
 
+		for _, resourceCount := range initialLoad {
+			attackersFreeCapacity -= resourceCount
+		}
+
+		// TODO: do not utilize this hack to make it re-calculate the epoch and current base
+		reCityCalculateResources(epoch, make(map[tResourceName]tResourceCount), defenderCity)
+
+		if attackersFreeCapacity < 0 {
+			// edge case: attackers bring resources to the defenders! inverted plunder
+			resourcesToLeave := -attackersFreeCapacity / tResourceCount(len(initialLoad))
+			negativeCost := make(map[tResourceName]tResourceCount)
+			for resourceName, resourceCount := range initialLoad {
+				initialLoad[resourceName] = resourceCount - resourcesToLeave
+				negativeCost[resourceName] = -resourcesToLeave
+			}
+			reCityCalculateResources(epoch, negativeCost, defenderCity)
+		} else if attackersFreeCapacity > 0 {
+			resourcesToPlunderPerType := attackersFreeCapacity / tResourceCount(len(defenderCity.resourceBase))
+			for resourceName, resourceCount := range defenderCity.resourceBase {
+				if resourceCount >= resourcesToPlunderPerType {
+					defenderCity.resourceBase[resourceName] -= resourcesToPlunderPerType
+					initialLoad[resourceName] += resourcesToPlunderPerType
+					attackersFreeCapacity -= resourcesToPlunderPerType
+				} else {
+					defenderCity.resourceBase[resourceName] -= resourceCount
+					initialLoad[resourceName] += resourceCount
+					attackersFreeCapacity -= resourceCount
+				}
+			}
+			// NOTE: do not rely on randomness of map key access for this second round ?
+			if attackersFreeCapacity > 0 {
+				for resourceName, resourceCount := range defenderCity.resourceBase {
+					if resourceCount == 0 || attackersFreeCapacity == 0 {
+						continue
+					}
+					if resourceCount >= attackersFreeCapacity {
+						defenderCity.resourceBase[resourceName] -= attackersFreeCapacity
+						initialLoad[resourceName] += attackersFreeCapacity
+						attackersFreeCapacity -= attackersFreeCapacity
+					} else {
+						defenderCity.resourceBase[resourceName] -= resourceCount
+						initialLoad[resourceName] += resourceCount
+						attackersFreeCapacity -= resourceCount
+					}
+				}
+			}
+		}
+
 		originCity := s.inMemoryState.cityList[arrivalMovement.OriginID]
-		speed := getMovementSpeed(arrivalMovement.UnitCount)
-		distance := dist(
+		speed := getGroupMovementSpeed(arrivalMovement.UnitCount)
+		travelDurationSec := travelTime(
 			arrivalMovement.DestinationY,
 			arrivalMovement.DestinationY,
 			originCity.locationX,
 			originCity.locationY,
+			speed,
 		)
-		travelDurationSec := int64(distance / speed)
 
-		s.inMemoryState.movementList[arrivalMovement.MovementID].originID = string(destinationID)
-		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationID = string(arrivalMovement.OriginID)
+		s.inMemoryState.movementList[arrivalMovement.MovementID].originID = destinationID
+		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationID = arrivalMovement.OriginID
 		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationX = originCity.locationX
 		s.inMemoryState.movementList[arrivalMovement.MovementID].destinationY = originCity.locationY
 		s.inMemoryState.movementList[arrivalMovement.MovementID].resourceCount = arrivalMovement.ResourceCount
@@ -647,6 +666,9 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 	return nil
 }
 
+// Processing will simply reinforce the city where they return to with units/resources.
+// If the units return to a city that was conquered - since they would not really expect
+// that, they are unfortunately massacred and everything is forever lost.
 func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event) error {
 	// parsing
 	returnMovement := returnMovementEvent{}
@@ -663,7 +685,7 @@ func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event)
 	case destinationCity == nil:
 		// city where the units left from no longer exists... everything in movement will disappear
 		delete(s.inMemoryState.movementList, returnMovement.MovementID)
-	case destinationCity.playerID != string(returnMovement.PlayerID):
+	case destinationCity.playerID != returnMovement.PlayerID:
 		// the city was captured by another player, everything is lost to avoid an eternal pendulum of a huge
 		// army
 		// TODO: don't do this when it is possible to conquer a city
@@ -671,14 +693,14 @@ func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event)
 	default:
 		s.toUpsert.cities[destinationID] = struct{}{} // upsert returned city
 		originCity := s.inMemoryState.cityList[returnMovement.OriginID]
-		speed := getMovementSpeed(returnMovement.UnitCount)
-		distance := dist(
+		speed := getGroupMovementSpeed(returnMovement.UnitCount)
+		travelDurationSec := travelTime(
 			returnMovement.DestinationY,
 			returnMovement.DestinationY,
 			originCity.locationX,
 			originCity.locationY,
+			speed,
 		)
-		travelDurationSec := int64(distance / speed)
 
 		// insert chain events
 		arrival := &arrivalMovementEvent{
@@ -698,7 +720,7 @@ func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event)
 		chainEvent := &event{
 			id:      uuid.NewString(),
 			name:    arrivalMovementEventName,
-			epoch:   int64(e.epoch) + travelDurationSec,
+			epoch:   e.epoch + travelDurationSec,
 			payload: string(payload),
 		}
 		err = s.repository.InsertEvent(ctx, chainEvent)
@@ -711,6 +733,8 @@ func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event)
 	return nil
 }
 
+// If the resources of the city are enough an event is set for the future
+// to create the units.
 func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) error {
 	// parsing
 	queueUnit := queueUnitEvent{}
@@ -720,14 +744,21 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	if s.inMemoryState.cityList[queueUnit.CityID].playerID != string(queueUnit.PlayerID) {
+	if s.inMemoryState.cityList[queueUnit.CityID].playerID != queueUnit.PlayerID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
-	err = reCalculateResources(e.epoch, readOnlyConfig.Units[queueUnit.UnitType].UnitCost, s.inMemoryState.cityList[queueUnit.CityID])
+	err = reCityCalculateResources(e.epoch, cfg.Units[queueUnit.UnitType].UnitCost, s.inMemoryState.cityList[queueUnit.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
-	trainingDurationSec := getTrainingDuration(queueUnit.UnitCount, queueUnit.UnitType, s.inMemoryState.cityList[queueUnit.CityID])
+
+	// TODO: measure and optimize
+	multiplier := 1.0
+	for _, buildingKey := range cumulativeTrainingMultipliers[queueUnit.UnitType] {
+		// TODO: formalize these equations to calculate game time ++ pre-compute most of this
+		multiplier *= cfg.Buildings[buildingKey].TrainingMultiplier[s.inMemoryState.cityList[queueUnit.CityID].buildingsLevel[buildingKey]]
+	}
+	trainingDurationSec := tSec(float64(cfg.Units[queueUnit.UnitType].UnitProductionSpeedSec*tSec(queueUnit.UnitCount)) * multiplier)
 
 	// insert chain events
 	createUnit := &createUnitEvent{
@@ -754,19 +785,21 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 
 	// upsert cached table and signal future view table upsert
 	queueItem := &unitQueueItem{
-		id:          string(queueUnit.UnitQueueItemID),
-		cityID:      string(queueUnit.CityID),
+		id:          queueUnit.UnitQueueItemID,
+		cityID:      queueUnit.CityID,
 		queuedEpoch: e.epoch,
 		durationSec: trainingDurationSec,
 		unitCount:   queueUnit.UnitCount,
-		unitType:    string(queueUnit.UnitType),
+		unitType:    queueUnit.UnitType,
 	}
-	s.inMemoryState.unitQueuesPerCity[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = queueItem
-	s.toUpsert.unitQ[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = struct{}{}
+	s.inMemoryState.unitQueuesPerCity[tCityID(queueItem.cityID)][tUnitQueueItemID(queueItem.id)] = queueItem
+	s.toUpsert.unitQ[tCityID(queueItem.cityID)][tUnitQueueItemID(queueItem.id)] = struct{}{}
 
 	return nil
 }
 
+// If the cityID still belongs to the original player, new units will be added to the city.
+// If the city was conquered by a different player, nothing will happen.
 func (s *EventSourcer) processCreateUnitEvent(_ context.Context, e *event) error {
 	// parsing
 	createUnit := createUnitEvent{}
@@ -778,7 +811,7 @@ func (s *EventSourcer) processCreateUnitEvent(_ context.Context, e *event) error
 	if createUnit.PlayerID != tPlayerID(s.inMemoryState.cityList[createUnit.CityID].playerID) {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "city has changed owner")
 	}
-	s.inMemoryState.cityList[createUnit.CityID].unitCount[string(createUnit.UnitType)] += int64(createUnit.UnitCount)
+	s.inMemoryState.cityList[createUnit.CityID].unitCount[createUnit.UnitType] += tUnitCount(createUnit.UnitCount)
 	delete(s.inMemoryState.unitQueuesPerCity[createUnit.CityID], createUnit.UnitQueueItemID)
 
 	// insert chain events
@@ -799,19 +832,19 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	if s.inMemoryState.cityList[queueBuilding.CityID].playerID != string(queueBuilding.PlayerID) {
+	if s.inMemoryState.cityList[queueBuilding.CityID].playerID != queueBuilding.PlayerID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
-	targetBuildingSpecs := readOnlyConfig.Buildings[queueBuilding.TargetBuilding]
-	if queueBuilding.TargetLevel > int64(targetBuildingSpecs.MaxLevel) {
+	targetBuildingSpecs := cfg.Buildings[queueBuilding.TargetBuilding]
+	if queueBuilding.TargetLevel > targetBuildingSpecs.MaxLevel {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot upgrade past max level")
 	}
-	currentBuildingLevel := s.inMemoryState.cityList[queueBuilding.CityID].buildingsLevel[string(queueBuilding.TargetBuilding)]
+	currentBuildingLevel := s.inMemoryState.cityList[queueBuilding.CityID].buildingsLevel[queueBuilding.TargetBuilding]
 	if queueBuilding.TargetLevel > currentBuildingLevel+1 {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "only upgrade 1 level at a time")
 	}
 	upgradeCost := targetBuildingSpecs.UpgradeCost[currentBuildingLevel]
-	err = reCalculateResources(e.epoch, upgradeCost, s.inMemoryState.cityList[queueBuilding.CityID])
+	err = reCityCalculateResources(e.epoch, upgradeCost, s.inMemoryState.cityList[queueBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -842,19 +875,21 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 
 	// upsert cached table and signal future view table upsert
 	queueItem := &buildingQueueItem{
-		id:             string(queueBuilding.BuildingQueueItemID),
-		cityID:         string(queueBuilding.CityID),
+		id:             queueBuilding.BuildingQueueItemID,
+		cityID:         queueBuilding.CityID,
 		queuedEpoch:    e.epoch,
 		durationSec:    upgradeDurationSec,
 		targetLevel:    queueBuilding.TargetLevel,
-		targetBuilding: string(queueBuilding.TargetBuilding),
+		targetBuilding: queueBuilding.TargetBuilding,
 	}
-	s.inMemoryState.buildingQueuesPerCity[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = queueItem
-	s.toUpsert.buildingQ[tCityID(queueItem.cityID)][tItemID(queueItem.id)] = struct{}{}
+	s.inMemoryState.buildingQueuesPerCity[tCityID(queueItem.cityID)][queueItem.id] = queueItem
+	s.toUpsert.buildingQ[tCityID(queueItem.cityID)][queueItem.id] = struct{}{}
 
 	return nil
 }
 
+// If the cityID still belongs to the original player, the building is upgraded.
+// If the city was conquered by a different player, nothing will happen.
 func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) error {
 	// parsing
 	upgradeBuilding := upgradeBuildingEvent{}
@@ -864,15 +899,15 @@ func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) 
 	}
 
 	// validation and event calculations
-	if s.inMemoryState.cityList[upgradeBuilding.CityID].playerID != string(upgradeBuilding.PlayerID) {
+	if s.inMemoryState.cityList[upgradeBuilding.CityID].playerID != upgradeBuilding.PlayerID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
 	// HACK: pass a zero cost event to re-calculate the base and increment the epoch
-	err = reCalculateResources(int64(e.epoch), make(tResourceCount), s.inMemoryState.cityList[upgradeBuilding.CityID])
+	err = reCityCalculateResources(e.epoch, make(map[tResourceName]tResourceCount), s.inMemoryState.cityList[upgradeBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
-	s.inMemoryState.cityList[upgradeBuilding.CityID].buildingsLevel[string(upgradeBuilding.TargetBuilding)] = int64(upgradeBuilding.TargetLevel)
+	s.inMemoryState.cityList[upgradeBuilding.CityID].buildingsLevel[upgradeBuilding.TargetBuilding] = upgradeBuilding.TargetLevel
 	delete(s.inMemoryState.buildingQueuesPerCity[upgradeBuilding.CityID], upgradeBuilding.BuildingQueueItemID)
 
 	// insert chain events
@@ -884,6 +919,9 @@ func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) 
 	return nil
 }
 
+// The city is created and all units/resources are added to the newly created city.
+// Note that this event might only be created for available locations, an arrival event
+// might also generate a createCityEvent if the conditions are met.
 func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error {
 	// parsing
 	createCity := createCityEvent{}
@@ -904,25 +942,27 @@ func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error
 
 	// upsert cached table and signal future view table upsert
 	s.inMemoryState.createCity(createCity.CityID, &city{
-		id:        string(createCity.CityID),
+		id:        createCity.CityID,
 		name:      createCity.Name,
-		playerID:  string(createCity.PlayerID),
+		playerID:  createCity.PlayerID,
 		locationX: createCity.LocationX,
 		locationY: createCity.LocationY,
 		// NOTE: all buildings start at level 0 in a city creation.
 		// Go default map values make it so that future calculations of
 		// level up are included.
-		buildingsLevel: make(map[string]int64),
+		buildingsLevel: make(map[tBuildingName]tBuildingLevel),
 		resourceBase:   createCity.ResourceCount,
 		resourceEpoch:  e.epoch,
 		unitCount:      createCity.UnitCount,
 	})
-	s.inMemoryState.buildingQueuesPerCity[createCity.CityID] = make(map[tItemID]*buildingQueueItem)
-	s.inMemoryState.unitQueuesPerCity[createCity.CityID] = make(map[tItemID]*unitQueueItem)
+	s.inMemoryState.buildingQueuesPerCity[createCity.CityID] = make(map[tBuildingQueueItemID]*buildingQueueItem)
+	s.inMemoryState.unitQueuesPerCity[createCity.CityID] = make(map[tUnitQueueItemID]*unitQueueItem)
 	s.toUpsert.cities[tCityID(createCity.CityID)] = struct{}{}
 	return nil
 }
 
+// Its processing will effectively delete the city, vanquish the resources,
+// raze the buildings, and annihilate all units residing the city.
 func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error {
 	// parsing
 	deleteCity := deleteCityEvent{}
@@ -932,7 +972,7 @@ func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error
 	}
 
 	// validation and event calculations
-	if s.inMemoryState.cityList[deleteCity.CityID].playerID != string(deleteCity.PlayerID) {
+	if s.inMemoryState.cityList[deleteCity.CityID].playerID != deleteCity.PlayerID {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot delete cities of other players")
 	}
 
@@ -944,7 +984,7 @@ func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error
 	return nil
 }
 
-func reCalculateResources(epoch int64, cost tResourceCount, c *city) error {
+func reCityCalculateResources(epoch tSec, cost map[tResourceName]tResourceCount, c *city) error {
 	missingResources := ""
 	for resourceName, resourceCost := range cost {
 		if c.resourceBase[resourceName] > resourceCost {
@@ -952,13 +992,13 @@ func reCalculateResources(epoch int64, cost tResourceCount, c *city) error {
 		}
 		// TODO: measure and optimize
 		multiplier := 1.0
-		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
+		for _, buildingKey := range cumulativeResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
-			multiplier *= readOnlyConfig.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[string(buildingKey)]]
+			multiplier *= cfg.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[buildingKey]]
 		}
-		currentResources := int64(float64(c.resourceBase[resourceName]) +
+		currentResources := tResourceCount(float64(c.resourceBase[resourceName]) +
 			float64(epoch-c.resourceEpoch)*
-				float64(readOnlyConfig.ResourceTrickles[tResourceName(resourceName)])*multiplier)
+				float64(cfg.ResourceTrickles[tResourceName(resourceName)])*multiplier)
 		if currentResources > resourceCost {
 			continue
 		}
@@ -971,187 +1011,34 @@ func reCalculateResources(epoch int64, cost tResourceCount, c *city) error {
 	c.resourceEpoch = epoch
 	for resourceName := range c.resourceBase {
 		multiplier := 1.0
-		for _, buildingKey := range readOnlyResourceMultipliers[tResourceName(resourceName)] {
+		for _, buildingKey := range cumulativeResourceMultipliers[tResourceName(resourceName)] {
 			// TODO: formalize these equations to calculate game time
-			multiplier *= readOnlyConfig.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[string(buildingKey)]]
+			multiplier *= cfg.Buildings[buildingKey].ResourceMultiplier[c.buildingsLevel[buildingKey]]
 		}
-		currentResources := int64(float64(c.resourceBase[resourceName]) +
+		currentResources := tResourceCount(float64(c.resourceBase[resourceName]) +
 			float64(epoch-c.resourceEpoch)*
-				float64(readOnlyConfig.ResourceTrickles[tResourceName(resourceName)])*multiplier)
+				float64(cfg.ResourceTrickles[tResourceName(resourceName)])*multiplier)
 		c.resourceBase[resourceName] = currentResources - cost[resourceName]
 	}
 	return nil
 }
 
-func reCalculateUnits(cost tUnitCount, c *city) error {
-	insufficientUnits := ""
-	for unitName, unitCount := range cost {
-		if c.unitCount[unitName] > unitCount {
-			continue
-		}
-		insufficientUnits += fmt.Sprintf("missing %s units", unitName)
-	}
-	if insufficientUnits != "" {
-		return fmt.Errorf(insufficientUnits)
-	}
-	for unitName, unitCount := range cost {
-		c.unitCount[unitName] -= unitCount
-	}
-	return nil
-}
-
-func getMovementSpeed(unitCount tUnitCount) float64 {
-	for _, unitName := range readOnlySlowestUnits {
-		if unitCount[string(unitName)] > 0 {
-			return readOnlyConfig.Units[unitName].UnitSpeed
+func getGroupMovementSpeed(unitCount map[tUnitName]tUnitCount) tSpeed {
+	for _, unitName := range sortedSlowestUnits {
+		if unitCount[unitName] > 0 {
+			return cfg.Units[unitName].UnitSpeed
 		}
 	}
 	// NOTE: this should not happen, as movements would only happen with pre-existing units
 	return 1.0
 }
 
-func getTrainingDuration(unitCount int64, unitName tUnitName, c *city) int64 {
-	// TODO: measure and optimize
-	multiplier := 1.0
-	for _, buildingKey := range readOnlyTrainingMultipliers[unitName] {
-		// TODO: formalize these equations to calculate game time
-		multiplier *= readOnlyConfig.Buildings[buildingKey].TrainingMultiplier[c.buildingsLevel[string(buildingKey)]]
-	}
-	return int64(float64(readOnlyConfig.Units[unitName].UnitProductionSpeedSec*unitCount) * multiplier)
-}
-
-func dist(x1, y1, x2, y2 int32) float64 {
+func travelTime(x1, y1, x2, y2 tCoordinate, speed tSpeed) tSec {
 	// TODO: measure and optimize
 	squareDist := (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)
 	if squareDist <= 0 {
 		return 0.0
 	}
-	return math.Sqrt(float64(squareDist))
-}
 
-func calculateForaging(units tUnitCount, initialLoad tResourceCount) {
-	// TODO ensure this does not overflow or avoid int64 for resource calculations (re-type it)
-	var (
-		freeCarryCapacity int64
-	)
-	for unitType, unitCount := range units {
-		freeCarryCapacity += unitCount * readOnlyConfig.Units[tUnitName(unitType)].CarryCapacity
-	}
-	for _, resourceCount := range initialLoad {
-		freeCarryCapacity -= resourceCount
-	}
-	if freeCarryCapacity < 1 {
-		return
-	}
-
-	foragableResources := int64(rand.Float64() * readOnlyConfig.ForagingCoefficient * float64(freeCarryCapacity))
-	for resourceName, resourceCount := range initialLoad { // FIXME: maps are not ordered, but is it random enough?
-		foragedResource := rand.Int63n(foragableResources)
-		initialLoad[resourceName] = resourceCount + foragedResource
-		foragableResources -= foragedResource
-	}
-}
-
-func calculateBattle(epoch int64, attackers tUnitCount, initialLoad tResourceCount, defenderCity *city) {
-	// TODO: a more balanced battle system (research how it is usually done)
-	// and use GPU for matrix calculations maybe?
-	var (
-		swing          = 0.0
-		swingMax int64 = 0
-		swingMin int64 = 0
-	)
-
-	attackerStats := make(tUnitStats)
-	for unitName, unitCount := range attackers {
-		for statName, statValue := range readOnlyConfig.Units[tUnitName(unitName)].CombatStats {
-			attackerStats[statName] += statValue * unitCount
-			swingMax += statValue * unitCount
-		}
-	}
-	defendersStats := make(tUnitStats)
-	for unitName, unitCount := range defenderCity.unitCount {
-		for statName, statValue := range readOnlyConfig.Units[tUnitName(unitName)].CombatStats {
-			defendersStats[statName] += statValue * unitCount
-			swingMin -= statValue * unitCount
-		}
-	}
-
-	for statName := range attackerStats {
-		swing += float64(attackerStats[statName])*(readOnlyConfig.CombatEfficiency+(1-readOnlyConfig.CombatEfficiency)*rand.Float64()) - float64(defendersStats[statName])*(readOnlyConfig.CombatEfficiency+(1-readOnlyConfig.CombatEfficiency)*rand.Float64())
-	}
-
-	normalizedSwing := 0.5 * swing / float64(swingMax-swingMin)
-	switch {
-	case swingMin == 0:
-		// no units lost, due to the fact that there were no defenders
-	case swingMax == 0 && swingMin < 0:
-		// no combatant units went attacking... so defenders just kill them
-		for unitName := range attackers {
-			attackers[unitName] = 0
-		}
-	default:
-		for unitName, unitCount := range defenderCity.unitCount {
-			defenderCity.unitCount[unitName] = int64(float64(unitCount) * (.5 - normalizedSwing))
-		}
-		for unitName, unitCount := range attackers {
-			attackers[unitName] = int64(float64(unitCount) * (.5 + normalizedSwing))
-		}
-	}
-	var (
-		attackersFreeCapacity int64
-	)
-	for unitType, unitCount := range attackers {
-		attackersFreeCapacity += unitCount * readOnlyConfig.Units[tUnitName(unitType)].CarryCapacity
-	}
-	for _, resourceCount := range initialLoad {
-		attackersFreeCapacity -= resourceCount
-	}
-
-	if attackersFreeCapacity < 0 {
-		// edge case: attackers bring resources to the defenders! inverted plunder
-		resourcesToLeave := -attackersFreeCapacity / int64(len(initialLoad))
-		negativeCost := make(tResourceCount)
-		for resourceName, resourceCount := range initialLoad {
-			initialLoad[resourceName] = resourceCount - resourcesToLeave
-			negativeCost[resourceName] = -resourcesToLeave
-		}
-		reCalculateResources(epoch, negativeCost, defenderCity)
-		return
-	}
-
-	// TODO: do not utilize this hack to make it re-calculate the epoch and current base
-	reCalculateResources(epoch, make(tResourceCount), defenderCity)
-
-	if attackersFreeCapacity > 0 {
-		resourcesToPlunderPerType := attackersFreeCapacity / int64(len(defenderCity.resourceBase))
-		for resourceName, resourceCount := range defenderCity.resourceBase {
-			if resourceCount >= resourcesToPlunderPerType {
-				defenderCity.resourceBase[resourceName] -= resourcesToPlunderPerType
-				initialLoad[resourceName] += resourcesToPlunderPerType
-				attackersFreeCapacity -= resourcesToPlunderPerType
-			} else {
-				defenderCity.resourceBase[resourceName] -= resourceCount
-				initialLoad[resourceName] += resourceCount
-				attackersFreeCapacity -= resourceCount
-			}
-		}
-		// NOTE: do not rely on randomness of map key access for this second round ?
-		if attackersFreeCapacity > 0 {
-			for resourceName, resourceCount := range defenderCity.resourceBase {
-				if resourceCount == 0 || attackersFreeCapacity == 0 {
-					continue
-				}
-				if resourceCount >= attackersFreeCapacity {
-					defenderCity.resourceBase[resourceName] -= attackersFreeCapacity
-					initialLoad[resourceName] += attackersFreeCapacity
-					attackersFreeCapacity -= attackersFreeCapacity
-				} else {
-					defenderCity.resourceBase[resourceName] -= resourceCount
-					initialLoad[resourceName] += resourceCount
-					attackersFreeCapacity -= resourceCount
-				}
-			}
-		}
-
-	}
+	return tSec(math.Sqrt(float64(squareDist)) / float64(speed))
 }

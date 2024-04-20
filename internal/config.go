@@ -7,54 +7,41 @@ import (
 	"sort"
 )
 
-type (
-	tMovementID      string
-	tPlayerID        string
-	tCityID          string
-	tEpoch           int64
-	tUnitCount       map[string]int64
-	tResourceCount   map[string]int64
-	tItemID          string
-	tBuildingName    string
-	tUnitName        string
-	tResourceTrickle int64
-	tResourceName    string
-	tUnitStats       map[string]int64
-)
-
 // NOTE: we take advantage of golang's defaults to false for units/resources
 // since a "get" in a map that does not have the keys is false
 type buildingSpecs struct {
-	ResourceMultiplier []float64              `json:"resourceMultiplier"`
-	TrainingMultiplier []float64              `json:"trainingMultiplier"`
-	UpgradeCost        []tResourceCount       `json:"cost"`
-	UpgradeSpeed       []int64                `json:"upgradeSpeed"`
-	MaxLevel           int                    `json:"maxLevel"`
-	Units              map[tUnitName]bool     `json:"units"`
-	Resources          map[tResourceName]bool `json:"resources"`
+	ResourceMultiplier []float64                          `json:"resourceMultiplier"`
+	TrainingMultiplier []float64                          `json:"trainingMultiplier"`
+	UpgradeCost        []map[tResourceName]tResourceCount `json:"cost"`
+	UpgradeSpeed       []tSec                             `json:"upgradeSpeed"`
+	MaxLevel           tBuildingLevel                     `json:"maxLevel"`
+	Units              map[tUnitName]bool                 `json:"units"`
+	Resources          map[tResourceName]bool             `json:"resources"`
 }
 
 type unitSpecs struct {
-	UnitSpeed              float64        `json:"speed"`
-	UnitProductionSpeedSec int64          `json:"productionSpeed"`
-	UnitCost               tResourceCount `json:"cost"`
-	CombatStats            tUnitStats     `json:"stats"`
-	CarryCapacity          int64          `json:"carryCapacity"`
+	UnitSpeed              tSpeed                           `json:"speed"`
+	UnitProductionSpeedSec tSec                             `json:"productionSpeed"`
+	UnitCost               map[tResourceName]tResourceCount `json:"cost"`
+	CombatStats            map[tUnitStatName]tUnitStatPower `json:"stats"`
+	CarryCapacity          tResourceCount                   `json:"carryCapacity"`
 }
 
 type gameConfig struct {
-	Buildings           map[tBuildingName]buildingSpecs    `json:"buildings"`
-	Units               map[tUnitName]unitSpecs            `json:"units"`
-	ResourceTrickles    map[tResourceName]tResourceTrickle `json:"resources"`
+	Buildings           map[tBuildingName]buildingSpecs  `json:"buildings"`
+	Units               map[tUnitName]unitSpecs          `json:"units"`
+	ResourceTrickles    map[tResourceName]tResourceCount `json:"resources"`
 	ForagingCoefficient float64
 	CombatEfficiency    float64
 }
 
 var (
-	readOnlyConfig              gameConfig
-	readOnlySlowestUnits        []tUnitName
-	readOnlyResourceMultipliers map[tResourceName][]tBuildingName
-	readOnlyTrainingMultipliers map[tUnitName][]tBuildingName
+	cfg gameConfig
+
+	// pre-computations
+	sortedSlowestUnits            []tUnitName
+	cumulativeResourceMultipliers map[tResourceName][]tBuildingName
+	cumulativeTrainingMultipliers map[tUnitName][]tBuildingName
 )
 
 func init() {
@@ -63,9 +50,9 @@ func init() {
 		panic(err)
 	}
 
-	readOnlyConfig = gameConfig{}
+	cfg = gameConfig{}
 
-	err = json.Unmarshal(rawConfig, &readOnlyConfig)
+	err = json.Unmarshal(rawConfig, &cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -79,28 +66,28 @@ func init() {
 
 	// NOTE: setup some pre-calculations for easier game logic
 
-	readOnlySlowestUnits = make([]tUnitName, 0, len(readOnlyConfig.Units))
-	for k := range readOnlyConfig.Units {
-		readOnlySlowestUnits = append(readOnlySlowestUnits, k)
+	sortedSlowestUnits = make([]tUnitName, 0, len(cfg.Units))
+	for k := range cfg.Units {
+		sortedSlowestUnits = append(sortedSlowestUnits, k)
 	}
-	sort.Slice(readOnlySlowestUnits, func(i, j int) bool {
-		return readOnlyConfig.Units[readOnlySlowestUnits[i]].UnitSpeed < readOnlyConfig.Units[readOnlySlowestUnits[j]].UnitSpeed
+	sort.Slice(sortedSlowestUnits, func(i, j int) bool {
+		return cfg.Units[sortedSlowestUnits[i]].UnitSpeed < cfg.Units[sortedSlowestUnits[j]].UnitSpeed
 	})
 
-	readOnlyResourceMultipliers := make(map[tResourceName][]tBuildingName, len(readOnlyConfig.ResourceTrickles))
-	for resourceKey := range readOnlyConfig.ResourceTrickles {
+	readOnlyResourceMultipliers := make(map[tResourceName][]tBuildingName, len(cfg.ResourceTrickles))
+	for resourceKey := range cfg.ResourceTrickles {
 		readOnlyResourceMultipliers[resourceKey] = make([]tBuildingName, 0)
-		for buildingKey, building := range readOnlyConfig.Buildings {
+		for buildingKey, building := range cfg.Buildings {
 			if !building.Resources[resourceKey] {
 				continue
 			}
 			readOnlyResourceMultipliers[resourceKey] = append(readOnlyResourceMultipliers[resourceKey], buildingKey)
 		}
 	}
-	readOnlyTrainingMultipliers := make(map[tUnitName][]tBuildingName, len(readOnlyConfig.Units))
-	for unitKey := range readOnlyConfig.Units {
+	readOnlyTrainingMultipliers := make(map[tUnitName][]tBuildingName, len(cfg.Units))
+	for unitKey := range cfg.Units {
 		readOnlyTrainingMultipliers[unitKey] = make([]tBuildingName, 0)
-		for buildingKey, building := range readOnlyConfig.Buildings {
+		for buildingKey, building := range cfg.Buildings {
 			if !building.Units[unitKey] {
 				continue
 			}
@@ -109,5 +96,5 @@ func init() {
 	}
 
 	// TODO efficiency range can come from config + future bonuses
-	readOnlyConfig.CombatEfficiency = rand.Float64()*0.3 + 0.7
+	cfg.CombatEfficiency = rand.Float64()*0.3 + 0.7
 }

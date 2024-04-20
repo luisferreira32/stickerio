@@ -39,6 +39,7 @@ create table if not exists movements_view (
 create table if not exists unit_queue_view (
     id text primary key,
     city_id text,
+    player_id text,
     queued_epoch int,
     duration_s int,
     unit_count int,
@@ -48,6 +49,7 @@ create table if not exists unit_queue_view (
 create table if not exists building_queue_view (
     id text primary key,
     city_id text,
+    player_id text,
     queued_epoch int,
     duration_s int,
     target_level int,
