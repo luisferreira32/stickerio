@@ -281,8 +281,8 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 		destinationID: tCityID(m.DestinationID),
 		destinationX:  tCoordinate(m.DestinationX),
 		destinationY:  tCoordinate(m.DestinationY),
-		resourceCount: m.ResourceCount,
-		unitCount:     m.UnitCount,
+		resourceCount: fromUntypedMap[tResourceName, tResourceCount](m.ResourceCount),
+		unitCount:     fromUntypedMap[tUnitName, tUnitCount](m.UnitCount),
 	})
 	if err != nil {
 		errHandle(w, err.Error())

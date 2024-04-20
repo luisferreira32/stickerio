@@ -10,27 +10,27 @@ import (
 // NOTE: we take advantage of golang's defaults to false for units/resources
 // since a "get" in a map that does not have the keys is false
 type buildingSpecs struct {
-	ResourceMultiplier []float64                          `json:"resourceMultiplier"`
-	TrainingMultiplier []float64                          `json:"trainingMultiplier"`
-	UpgradeCost        []map[tResourceName]tResourceCount `json:"cost"`
-	UpgradeSpeed       []tSec                             `json:"upgradeSpeed"`
-	MaxLevel           tBuildingLevel                     `json:"maxLevel"`
-	Units              map[tUnitName]bool                 `json:"units"`
-	Resources          map[tResourceName]bool             `json:"resources"`
+	ResourceMultiplier []float64              `json:"resourceMultiplier"`
+	TrainingMultiplier []float64              `json:"trainingMultiplier"`
+	UpgradeCost        []tResourcesCount      `json:"cost"`
+	UpgradeSpeed       []tSec                 `json:"upgradeSpeed"`
+	MaxLevel           tBuildingLevel         `json:"maxLevel"`
+	Units              map[tUnitName]bool     `json:"units"`
+	Resources          map[tResourceName]bool `json:"resources"`
 }
 
 type unitSpecs struct {
 	UnitSpeed              tSpeed                           `json:"speed"`
 	UnitProductionSpeedSec tSec                             `json:"productionSpeed"`
-	UnitCost               map[tResourceName]tResourceCount `json:"cost"`
+	UnitCost               tResourcesCount                  `json:"cost"`
 	CombatStats            map[tUnitStatName]tUnitStatPower `json:"stats"`
 	CarryCapacity          tResourceCount                   `json:"carryCapacity"`
 }
 
 type gameConfig struct {
-	Buildings           map[tBuildingName]buildingSpecs  `json:"buildings"`
-	Units               map[tUnitName]unitSpecs          `json:"units"`
-	ResourceTrickles    map[tResourceName]tResourceCount `json:"resources"`
+	Buildings           map[tBuildingName]buildingSpecs `json:"buildings"`
+	Units               map[tUnitName]unitSpecs         `json:"units"`
+	ResourceTrickles    tResourcesCount                 `json:"resources"`
 	ForagingCoefficient float64
 	CombatEfficiency    float64
 }

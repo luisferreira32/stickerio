@@ -26,7 +26,43 @@ type (
 	tResourceCount int64
 	tCoordinate    int32
 	tSpeed         float64
+
+	tResourcesCount map[tResourceName]tResourceCount
+	tBuildingsLevel map[tBuildingName]tBuildingLevel
+	tUnitsCount     map[tUnitName]tUnitCount
 )
+
+func fromUntypedMap[K ~string, V ~int64](m map[string]int64) map[K]V {
+	typedMap := make(map[K]V, len(m))
+	for k, v := range m {
+		typedMap[K(k)] = V(v)
+	}
+	return typedMap
+}
+
+func (t tResourcesCount) toUntypedMap() map[string]int64 {
+	ut := make(map[string]int64, len(t))
+	for k, v := range t {
+		ut[string(k)] = int64(v)
+	}
+	return ut
+}
+
+func (t tBuildingsLevel) toUntypedMap() map[string]int64 {
+	ut := make(map[string]int64, len(t))
+	for k, v := range t {
+		ut[string(k)] = int64(v)
+	}
+	return ut
+}
+
+func (t tUnitsCount) toUntypedMap() map[string]int64 {
+	ut := make(map[string]int64, len(t))
+	for k, v := range t {
+		ut[string(k)] = int64(v)
+	}
+	return ut
+}
 
 type dbCity struct {
 	id             tCityID
@@ -46,29 +82,13 @@ type city struct {
 	playerID       tPlayerID
 	locationX      tCoordinate
 	locationY      tCoordinate
-	buildingsLevel map[tBuildingName]tBuildingLevel
-	resourceBase   map[tResourceName]tResourceCount
+	buildingsLevel tBuildingsLevel
+	resourceBase   tResourcesCount
 	resourceEpoch  tSec
-	unitCount      map[tUnitName]tUnitCount
-}
-
-func cityFromAPIModel(apiCity *api.V1City) *city {
-	return &city{}
+	unitCount      tUnitsCount
 }
 
 func cityToAPIModel(c *city) api.V1City {
-	buildings := make(map[string]int64, len(c.buildingsLevel))
-	for k, v := range c.buildingsLevel {
-		buildings[string(k)] = int64(v)
-	}
-	baseCount := make(map[string]int64, len(c.resourceBase))
-	for k, v := range c.resourceBase {
-		baseCount[string(k)] = int64(v)
-	}
-	units := make(map[string]int64, len(c.unitCount))
-	for k, v := range c.unitCount {
-		units[string(k)] = int64(v)
-	}
 	return api.V1City{
 		CityInfo: api.V1CityInfo{
 			Id:        string(c.id),
@@ -77,12 +97,12 @@ func cityToAPIModel(c *city) api.V1City {
 			LocationX: int32(c.locationX),
 			LocationY: int32(c.locationY),
 		},
-		Buildings: buildings,
+		Buildings: c.buildingsLevel.toUntypedMap(),
 		CityResources: api.V1CityResources{
 			Epoch:     int64(c.resourceEpoch),
-			BaseCount: baseCount,
+			BaseCount: c.resourceBase.toUntypedMap(),
 		},
-		UnitCount: units,
+		UnitCount: c.unitCount.toUntypedMap(),
 	}
 }
 
@@ -97,17 +117,17 @@ func cityToCityInfoAPIModel(c *city) api.V1CityInfo {
 }
 
 func cityFromDBModel(dbCity *dbCity) (*city, error) {
-	resourceBase := make(map[tResourceName]tResourceCount)
+	resourceBase := make(tResourcesCount)
 	err := json.Unmarshal([]byte(dbCity.resourceBase), &resourceBase)
 	if err != nil {
 		return nil, err
 	}
-	unitCount := make(map[tUnitName]tUnitCount)
+	unitCount := make(tUnitsCount)
 	err = json.Unmarshal([]byte(dbCity.unitCount), &unitCount)
 	if err != nil {
 		return nil, err
 	}
-	buildingsLevel := make(map[tBuildingName]tBuildingLevel)
+	buildingsLevel := make(tBuildingsLevel)
 	err = json.Unmarshal([]byte(dbCity.buildingsLevel), &buildingsLevel)
 	if err != nil {
 		return nil, err
@@ -173,8 +193,8 @@ type movement struct {
 	destinationY   tCoordinate
 	departureEpoch tSec
 	speed          tSpeed
-	resourceCount  map[tResourceName]tResourceCount
-	unitCount      map[tUnitName]tUnitCount
+	resourceCount  tResourcesCount
+	unitCount      tUnitsCount
 }
 
 func movementToAPIModel(m *movement) api.V1Movement {
@@ -201,12 +221,12 @@ func movementToAPIModel(m *movement) api.V1Movement {
 }
 
 func movementFromDBModel(dbMovement *dbMovement) (*movement, error) {
-	resourceCount := make(map[tResourceName]tResourceCount)
+	resourceCount := make(tResourcesCount)
 	err := json.Unmarshal([]byte(dbMovement.resourceCount), &resourceCount)
 	if err != nil {
 		return nil, err
 	}
-	unitCount := make(map[tUnitName]tUnitCount)
+	unitCount := make(tUnitsCount)
 	err = json.Unmarshal([]byte(dbMovement.unitCount), &unitCount)
 	if err != nil {
 		return nil, err
@@ -268,10 +288,6 @@ type unitQueueItem struct {
 	unitType    tUnitName
 }
 
-func unitQueueItemFromAPIModel(apiItem *api.V1UnitQueueItem) *unitQueueItem {
-	return &unitQueueItem{}
-}
-
 func unitQueueItemToAPIModel(item *unitQueueItem) api.V1UnitQueueItem {
 	return api.V1UnitQueueItem{
 		Id:          string(item.id),
@@ -326,10 +342,6 @@ type buildingQueueItem struct {
 	targetBuilding tBuildingName
 }
 
-func buildingQueueItemFromAPIModel(apiItem *api.V1BuildingQueueItem) *buildingQueueItem {
-	return &buildingQueueItem{}
-}
-
 func buildingQueueItemToAPIModel(item *buildingQueueItem) api.V1BuildingQueueItem {
 	return api.V1BuildingQueueItem{
 		Id:          string(item.id),
@@ -372,37 +384,37 @@ type event struct {
 }
 
 type startMovementEvent struct {
-	MovementID     tMovementID                      `json:"movementID"`
-	PlayerID       tPlayerID                        `json:"playerID"`
-	OriginID       tCityID                          `json:"originID"`
-	DestinationID  tCityID                          `json:"destinationID"`
-	DestinationX   tCoordinate                      `json:"destinationX"`
-	DestinationY   tCoordinate                      `json:"destinationY"`
-	DepartureEpoch tSec                             `json:"departureEpoch"`
-	UnitCount      map[tUnitName]tUnitCount         `json:"unitCount"`
-	ResourceCount  map[tResourceName]tResourceCount `json:"resourceCount"`
+	MovementID     tMovementID     `json:"movementID"`
+	PlayerID       tPlayerID       `json:"playerID"`
+	OriginID       tCityID         `json:"originID"`
+	DestinationID  tCityID         `json:"destinationID"`
+	DestinationX   tCoordinate     `json:"destinationX"`
+	DestinationY   tCoordinate     `json:"destinationY"`
+	DepartureEpoch tSec            `json:"departureEpoch"`
+	UnitCount      tUnitsCount     `json:"unitCount"`
+	ResourceCount  tResourcesCount `json:"resourceCount"`
 }
 
 type arrivalMovementEvent struct {
-	MovementID    tMovementID                      `json:"movementID"`
-	PlayerID      tPlayerID                        `json:"playerID"`
-	OriginID      tCityID                          `json:"originID"`
-	DestinationID tCityID                          `json:"destinationID"`
-	DestinationX  tCoordinate                      `json:"destinationX"`
-	DestinationY  tCoordinate                      `json:"destinationY"`
-	UnitCount     map[tUnitName]tUnitCount         `json:"unitCount"`
-	ResourceCount map[tResourceName]tResourceCount `json:"resourceCount"`
+	MovementID    tMovementID     `json:"movementID"`
+	PlayerID      tPlayerID       `json:"playerID"`
+	OriginID      tCityID         `json:"originID"`
+	DestinationID tCityID         `json:"destinationID"`
+	DestinationX  tCoordinate     `json:"destinationX"`
+	DestinationY  tCoordinate     `json:"destinationY"`
+	UnitCount     tUnitsCount     `json:"unitCount"`
+	ResourceCount tResourcesCount `json:"resourceCount"`
 }
 
 type returnMovementEvent struct {
-	MovementID    tMovementID                      `json:"movementID"`
-	PlayerID      tPlayerID                        `json:"playerID"`
-	OriginID      tCityID                          `json:"originID"`
-	DestinationID tCityID                          `json:"destinationID"`
-	DestinationX  tCoordinate                      `json:"destinationX"`
-	DestinationY  tCoordinate                      `json:"destinationY"`
-	UnitCount     map[tUnitName]tUnitCount         `json:"unitCount"`
-	ResourceCount map[tResourceName]tResourceCount `json:"resourceCount"`
+	MovementID    tMovementID     `json:"movementID"`
+	PlayerID      tPlayerID       `json:"playerID"`
+	OriginID      tCityID         `json:"originID"`
+	DestinationID tCityID         `json:"destinationID"`
+	DestinationX  tCoordinate     `json:"destinationX"`
+	DestinationY  tCoordinate     `json:"destinationY"`
+	UnitCount     tUnitsCount     `json:"unitCount"`
+	ResourceCount tResourcesCount `json:"resourceCount"`
 }
 
 type queueUnitEvent struct {
@@ -438,13 +450,13 @@ type upgradeBuildingEvent struct {
 }
 
 type createCityEvent struct {
-	CityID        tCityID                          `json:"cityID"`
-	Name          string                           `json:"name"`
-	PlayerID      tPlayerID                        `json:"playerID"`
-	LocationX     tCoordinate                      `json:"locationX"`
-	LocationY     tCoordinate                      `json:"locationY"`
-	ResourceCount map[tResourceName]tResourceCount `json:"resourceCount"`
-	UnitCount     map[tUnitName]tUnitCount         `json:"unitCount"`
+	CityID        tCityID         `json:"cityID"`
+	Name          string          `json:"name"`
+	PlayerID      tPlayerID       `json:"playerID"`
+	LocationX     tCoordinate     `json:"locationX"`
+	LocationY     tCoordinate     `json:"locationY"`
+	ResourceCount tResourcesCount `json:"resourceCount"`
+	UnitCount     tUnitsCount     `json:"unitCount"`
 }
 
 type deleteCityEvent struct {

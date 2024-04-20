@@ -570,12 +570,12 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 		}
 
 		// TODO: do not utilize this hack to make it re-calculate the epoch and current base
-		reCityCalculateResources(epoch, make(map[tResourceName]tResourceCount), defenderCity)
+		reCityCalculateResources(epoch, make(tResourcesCount), defenderCity)
 
 		if attackersFreeCapacity < 0 {
 			// edge case: attackers bring resources to the defenders! inverted plunder
 			resourcesToLeave := -attackersFreeCapacity / tResourceCount(len(initialLoad))
-			negativeCost := make(map[tResourceName]tResourceCount)
+			negativeCost := make(tResourcesCount)
 			for resourceName, resourceCount := range initialLoad {
 				initialLoad[resourceName] = resourceCount - resourcesToLeave
 				negativeCost[resourceName] = -resourcesToLeave
@@ -903,7 +903,7 @@ func (s *EventSourcer) processUpgradeBuildingEvent(_ context.Context, e *event) 
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, "cannot alter cities of other players")
 	}
 	// HACK: pass a zero cost event to re-calculate the base and increment the epoch
-	err = reCityCalculateResources(e.epoch, make(map[tResourceName]tResourceCount), s.inMemoryState.cityList[upgradeBuilding.CityID])
+	err = reCityCalculateResources(e.epoch, make(tResourcesCount), s.inMemoryState.cityList[upgradeBuilding.CityID])
 	if err != nil {
 		return fmt.Errorf("%w, event %s, reason: %s", errPreConditionFailed, e.id, err.Error())
 	}
@@ -950,7 +950,7 @@ func (s *EventSourcer) processCreateCityEvent(_ context.Context, e *event) error
 		// NOTE: all buildings start at level 0 in a city creation.
 		// Go default map values make it so that future calculations of
 		// level up are included.
-		buildingsLevel: make(map[tBuildingName]tBuildingLevel),
+		buildingsLevel: make(tBuildingsLevel),
 		resourceBase:   createCity.ResourceCount,
 		resourceEpoch:  e.epoch,
 		unitCount:      createCity.UnitCount,
@@ -984,7 +984,7 @@ func (s *EventSourcer) processDeleteCityEvent(_ context.Context, e *event) error
 	return nil
 }
 
-func reCityCalculateResources(epoch tSec, cost map[tResourceName]tResourceCount, c *city) error {
+func reCityCalculateResources(epoch tSec, cost tResourcesCount, c *city) error {
 	missingResources := ""
 	for resourceName, resourceCost := range cost {
 		if c.resourceBase[resourceName] > resourceCost {
@@ -1023,7 +1023,7 @@ func reCityCalculateResources(epoch tSec, cost map[tResourceName]tResourceCount,
 	return nil
 }
 
-func getGroupMovementSpeed(unitCount map[tUnitName]tUnitCount) tSpeed {
+func getGroupMovementSpeed(unitCount tUnitsCount) tSpeed {
 	for _, unitName := range sortedSlowestUnits {
 		if unitCount[unitName] > 0 {
 			return cfg.Units[unitName].UnitSpeed

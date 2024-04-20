@@ -265,8 +265,8 @@ func (s *inserterService) CreateCity(ctx context.Context, playerID string, c *ci
 		// this comes with no resources and units - you build from zero. Only
 		// founded cities later in the game generate events with these two
 		// fields populated.
-		ResourceCount: make(map[tResourceName]tResourceCount),
-		UnitCount:     make(map[tUnitName]tUnitCount),
+		ResourceCount: make(tResourcesCount),
+		UnitCount:     make(tUnitsCount),
 	}
 	payload, err := json.Marshal(createCity)
 	if err != nil {
