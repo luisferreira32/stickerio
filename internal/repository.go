@@ -24,13 +24,6 @@ type StickerioRepository struct {
 	db *sql.DB
 }
 
-type event struct {
-	id      string
-	name    string
-	epoch   int64
-	payload string // TODO: json encode might not be the most efficient way - improve this
-}
-
 func (r *StickerioRepository) InsertEvent(ctx context.Context, e *event) error {
 	const insertEventQuery = `
 INSERT INTO event_source(id, event_name, epoch, payload) VALUES ($1, $2, $3, $4)
@@ -80,18 +73,6 @@ ORDER BY epoch, id
 	}
 
 	return results, nil
-}
-
-type dbCity struct {
-	id             string
-	name           string
-	playerID       string
-	locationX      int32
-	locationY      int32
-	buildingsLevel string
-	resourceBase   string
-	resourceEpoch  int64
-	unitCount      string
 }
 
 func (r *StickerioRepository) GetCity(ctx context.Context, id, playerID string) (*dbCity, error) {
@@ -311,19 +292,6 @@ WHERE id=$1
 	return nil
 }
 
-type dbMovement struct {
-	id             string
-	playerID       string
-	originID       string
-	destinationID  string
-	destinationX   int32
-	destinationY   int32
-	departureEpoch int64
-	speed          float64
-	resourceCount  string
-	unitCount      string
-}
-
 func (r *StickerioRepository) GetMovement(ctx context.Context, id, playerID string) (*dbMovement, error) {
 	const getMovementQuery = `
 SELECT
@@ -506,29 +474,21 @@ WHERE id=$1
 	return nil
 }
 
-type dbUnitQueueItem struct {
-	id          string
-	cityID      string
-	queuedEpoch int64
-	durationSec int64
-	unitCount   int64
-	unitType    string
-}
-
-func (r *StickerioRepository) GetUnitQueueItem(ctx context.Context, id, cityID string) (*dbUnitQueueItem, error) {
+func (r *StickerioRepository) GetUnitQueueItem(ctx context.Context, id, cityID, playerID string) (*dbUnitQueueItem, error) {
 	const getUnitQueueItemQuery = `
 SELECT
 id,
 city_id,
+player_id,
 queued_epoch,
 duration_s,
 unit_count,
 unit_type
 FROM unit_queue_view
-WHERE id=$1 AND city_id=$2
+WHERE id=$1 AND city_id=$2 AND player_id=$3
 `
 
-	rows, err := r.db.QueryContext(ctx, getUnitQueueItemQuery, id, cityID)
+	rows, err := r.db.QueryContext(ctx, getUnitQueueItemQuery, id, cityID, playerID)
 	if err != nil {
 		return nil, fmt.Errorf("getUnitQueueItemQuery failed: %w", err)
 	}
@@ -539,6 +499,7 @@ WHERE id=$1 AND city_id=$2
 		err := rows.Scan(
 			&result.id,
 			&result.cityID,
+			&result.playerID,
 			&result.queuedEpoch,
 			&result.durationSec,
 			&result.unitCount,
@@ -556,20 +517,21 @@ WHERE id=$1 AND city_id=$2
 	return result, nil
 }
 
-func (r *StickerioRepository) ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*dbUnitQueueItem, error) {
-	filtersValues := []interface{}{cityID, lastID, pageSize}
+func (r *StickerioRepository) ListUnitQueueItems(ctx context.Context, cityID, playerID, lastID string, pageSize int) ([]*dbUnitQueueItem, error) {
+	filtersValues := []interface{}{cityID, playerID, lastID, pageSize}
 	const listUnitQueueItemsQuery = `
 SELECT
 id,
 city_id,
+player_id,
 queued_epoch,
 duration_s,
 unit_count,
 unit_type
 FROM unit_queue_view
-WHERE city_id=$1 AND id>$2
+WHERE city_id=$1 AND player_id=$2 AND id>$3
 ORDER BY id
-LIMIT $3
+LIMIT $4
 `
 
 	rows, err := r.db.QueryContext(ctx, listUnitQueueItemsQuery, filtersValues...)
@@ -584,6 +546,7 @@ LIMIT $3
 		err := rows.Scan(
 			&result.id,
 			&result.cityID,
+			&result.playerID,
 			&result.queuedEpoch,
 			&result.durationSec,
 			&result.unitCount,
@@ -607,11 +570,12 @@ func (r *StickerioRepository) UpsertUnitQueueItem(ctx context.Context, m *dbUnit
 INSERT INTO unit_queue_view(
 id,
 city_id,
+player_id,
 queued_epoch,
 duration_s,
 unit_count,
 unit_type)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT(id) REPLACE
 `
 
@@ -620,6 +584,7 @@ ON CONFLICT(id) REPLACE
 		upsertUnitQueueItemQuery,
 		m.id,
 		m.cityID,
+		m.playerID,
 		m.queuedEpoch,
 		m.durationSec,
 		m.unitCount,
@@ -668,29 +633,21 @@ WHERE city_id=$1
 	return nil
 }
 
-type dbBuildingQueueItem struct {
-	id             string
-	cityID         string
-	queuedEpoch    int64
-	durationSec    int64
-	targetLevel    int64
-	targetBuilding string
-}
-
-func (r *StickerioRepository) GetBuildingQueueItem(ctx context.Context, id, cityID string) (*dbBuildingQueueItem, error) {
+func (r *StickerioRepository) GetBuildingQueueItem(ctx context.Context, id, cityID, playerID string) (*dbBuildingQueueItem, error) {
 	const getUnitQueueItemQuery = `
 SELECT
 id,
 city_id,
+player_id,
 queued_epoch,
 duration_s,
 target_level,
 target_building
 FROM building_queue_view
-WHERE id=$1 AND city_id=$2
+WHERE id=$1 AND city_id=$2 AND player_id=$3 
 `
 
-	rows, err := r.db.QueryContext(ctx, getUnitQueueItemQuery, id, cityID)
+	rows, err := r.db.QueryContext(ctx, getUnitQueueItemQuery, id, cityID, playerID)
 	if err != nil {
 		return nil, fmt.Errorf("getUnitQueueItemQuery failed: %w", err)
 	}
@@ -701,6 +658,7 @@ WHERE id=$1 AND city_id=$2
 		err := rows.Scan(
 			&result.id,
 			&result.cityID,
+			&result.playerID,
 			&result.queuedEpoch,
 			&result.durationSec,
 			&result.targetLevel,
@@ -718,20 +676,21 @@ WHERE id=$1 AND city_id=$2
 	return result, nil
 }
 
-func (r *StickerioRepository) ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*dbBuildingQueueItem, error) {
-	filtersValues := []interface{}{cityID, lastID, pageSize}
+func (r *StickerioRepository) ListBuildingQueueItems(ctx context.Context, cityID, playerID, lastID string, pageSize int) ([]*dbBuildingQueueItem, error) {
+	filtersValues := []interface{}{cityID, playerID, lastID, pageSize}
 	const listBuildingQueueItemsQuery = `
 SELECT
 id,
 city_id,
+player_id,
 queued_epoch,
 duration_s,
 target_level,
 target_building
 FROM building_queue_view
-WHERE city_id=$1 AND id>$2
+WHERE city_id=$1 AND player_id=$2 AND id>$3
 ORDER BY id
-LIMIT $3
+LIMIT $4
 `
 
 	rows, err := r.db.QueryContext(ctx, listBuildingQueueItemsQuery, filtersValues...)
@@ -746,6 +705,7 @@ LIMIT $3
 		err := rows.Scan(
 			&result.id,
 			&result.cityID,
+			&result.playerID,
 			&result.queuedEpoch,
 			&result.durationSec,
 			&result.targetLevel,
@@ -769,11 +729,12 @@ func (r *StickerioRepository) UpsertBuildingQueueItem(ctx context.Context, m *db
 INSERT INTO building_queue_view(
 id,
 city_id,
+player_id,
 queued_epoch,
 duration_s,
 target_level,
 target_building)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT(id) REPLACE
 `
 
@@ -782,6 +743,7 @@ ON CONFLICT(id) REPLACE
 		upsertBuildingQueueItemQuery,
 		m.id,
 		m.cityID,
+		m.playerID,
 		m.queuedEpoch,
 		m.durationSec,
 		m.targetLevel,

@@ -14,81 +14,14 @@ type viewerRepository interface {
 	ListCityInfo(ctx context.Context, lastID string, pageSize int, filters ...listCityInfoFilterOpt) ([]*dbCity, error)
 	GetMovement(ctx context.Context, id, playerID string) (*dbMovement, error)
 	ListMovements(ctx context.Context, playerID, lastID string, pageSize int, filters ...listMovementsFilterOpt) ([]*dbMovement, error)
-	GetUnitQueueItem(ctx context.Context, id, cityID string) (*dbUnitQueueItem, error)
-	ListUnitQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*dbUnitQueueItem, error)
-	GetBuildingQueueItem(ctx context.Context, id, cityID string) (*dbBuildingQueueItem, error)
-	ListBuildingQueueItems(ctx context.Context, cityID, lastID string, pageSize int) ([]*dbBuildingQueueItem, error)
+	GetUnitQueueItem(ctx context.Context, id, cityID, playerID string) (*dbUnitQueueItem, error)
+	ListUnitQueueItems(ctx context.Context, cityID, playerID, lastID string, pageSize int) ([]*dbUnitQueueItem, error)
+	GetBuildingQueueItem(ctx context.Context, id, cityID, playerID string) (*dbBuildingQueueItem, error)
+	ListBuildingQueueItems(ctx context.Context, cityID, playerID, lastID string, pageSize int) ([]*dbBuildingQueueItem, error)
 }
 
 type viewerService struct {
 	repository viewerRepository
-}
-
-type city struct {
-	id             string
-	name           string
-	playerID       string
-	locationX      int32
-	locationY      int32
-	buildingsLevel map[string]int64
-	resourceBase   map[string]int64
-	resourceEpoch  int64
-	unitCount      map[string]int64
-}
-
-func cityFromDBModel(dbCity *dbCity) (*city, error) {
-	resourceBase := make(map[string]int64)
-	err := json.Unmarshal([]byte(dbCity.resourceBase), &resourceBase)
-	if err != nil {
-		return nil, err
-	}
-	unitCount := make(map[string]int64)
-	err = json.Unmarshal([]byte(dbCity.unitCount), &unitCount)
-	if err != nil {
-		return nil, err
-	}
-	buildingsLevel := make(map[string]int64)
-	err = json.Unmarshal([]byte(dbCity.buildingsLevel), &buildingsLevel)
-	if err != nil {
-		return nil, err
-	}
-	return &city{
-		id:             dbCity.id,
-		name:           dbCity.name,
-		playerID:       dbCity.playerID,
-		locationX:      dbCity.locationX,
-		locationY:      dbCity.locationY,
-		buildingsLevel: buildingsLevel,
-		resourceBase:   resourceBase,
-		resourceEpoch:  dbCity.resourceEpoch,
-		unitCount:      unitCount,
-	}, nil
-}
-
-func cityToDBModel(c *city) (*dbCity, error) {
-	resourceBase, err := json.Marshal(c.resourceBase)
-	if err != nil {
-		return nil, err
-	}
-	unitCount, err := json.Marshal(c.unitCount)
-	if err != nil {
-		return nil, err
-	}
-	buildingsLevel, err := json.Marshal(c.buildingsLevel)
-	if err != nil {
-		return nil, err
-	}
-	return &dbCity{
-		id:             c.id,
-		name:           c.name,
-		playerID:       c.playerID,
-		locationX:      c.locationX,
-		locationY:      c.locationY,
-		buildingsLevel: string(buildingsLevel),
-		resourceBase:   string(resourceBase),
-		resourceEpoch:  c.resourceEpoch,
-		unitCount:      string(unitCount),
-	}, nil
 }
 
 func (s *viewerService) GetCity(ctx context.Context, id, playerID string) (*city, error) {
@@ -131,68 +64,6 @@ func (s *viewerService) ListCityInfo(ctx context.Context, lastID string, pageSiz
 	return cities, nil
 }
 
-type movement struct {
-	id             string
-	playerID       string
-	originID       string
-	destinationID  string
-	destinationX   int32
-	destinationY   int32
-	departureEpoch int64
-	speed          float64
-	resourceCount  map[string]int64
-	unitCount      map[string]int64
-}
-
-func movementFromDBModel(dbMovement *dbMovement) (*movement, error) {
-	resourceCount := make(map[string]int64)
-	err := json.Unmarshal([]byte(dbMovement.resourceCount), &resourceCount)
-	if err != nil {
-		return nil, err
-	}
-	unitCount := make(map[string]int64)
-	err = json.Unmarshal([]byte(dbMovement.unitCount), &unitCount)
-	if err != nil {
-		return nil, err
-	}
-	return &movement{
-		id:             dbMovement.id,
-		playerID:       dbMovement.playerID,
-		originID:       dbMovement.originID,
-		destinationID:  dbMovement.destinationID,
-		destinationX:   dbMovement.destinationX,
-		destinationY:   dbMovement.destinationY,
-		departureEpoch: dbMovement.departureEpoch,
-		speed:          dbMovement.speed,
-		resourceCount:  resourceCount,
-		unitCount:      unitCount,
-	}, nil
-}
-
-func movementToDBModel(m *movement) (*dbMovement, error) {
-	resourceCount, err := json.Marshal(m.resourceCount)
-	if err != nil {
-		return nil, err
-	}
-	unitCount, err := json.Marshal(m.unitCount)
-	if err != nil {
-		return nil, err
-	}
-	return &dbMovement{
-		id:             m.id,
-		playerID:       m.playerID,
-		originID:       m.originID,
-		destinationID:  m.destinationID,
-		destinationX:   m.destinationX,
-		destinationY:   m.destinationY,
-		departureEpoch: m.departureEpoch,
-		speed:          m.speed,
-		resourceCount:  string(resourceCount),
-		unitCount:      string(unitCount),
-	}, nil
-
-}
-
 func (s *viewerService) GetMovement(ctx context.Context, id, playerID string) (*movement, error) {
 	movement, err := s.repository.GetMovement(ctx, id, playerID)
 	if err != nil {
@@ -226,44 +97,8 @@ func (s *viewerService) ListMovements(ctx context.Context, playerID, lastID stri
 	return movements, nil
 }
 
-type unitQueueItem struct {
-	id          string
-	cityID      string
-	queuedEpoch int64
-	durationSec int64
-	unitCount   int64
-	unitType    string
-}
-
-func unitQueueItemFromDBModel(item *dbUnitQueueItem) *unitQueueItem {
-	return &unitQueueItem{
-		id:          item.id,
-		cityID:      item.cityID,
-		queuedEpoch: item.queuedEpoch,
-		durationSec: item.durationSec,
-		unitCount:   item.unitCount,
-		unitType:    item.unitType,
-	}
-}
-
-func unitQueueItemToDBModel(item *unitQueueItem) *dbUnitQueueItem {
-	return &dbUnitQueueItem{
-		id:          item.id,
-		cityID:      item.cityID,
-		queuedEpoch: item.queuedEpoch,
-		durationSec: item.durationSec,
-		unitCount:   item.unitCount,
-		unitType:    item.unitType,
-	}
-}
-
 func (s *viewerService) GetUnitQueueItem(ctx context.Context, id, cityID, playerID string) (*unitQueueItem, error) {
-	city, err := s.repository.GetCity(ctx, cityID, playerID)
-	if err != nil {
-		return nil, err
-	}
-
-	item, err := s.repository.GetUnitQueueItem(ctx, id, city.id)
+	item, err := s.repository.GetUnitQueueItem(ctx, id, cityID, playerID)
 	if err != nil {
 		return nil, err
 	}
@@ -272,12 +107,7 @@ func (s *viewerService) GetUnitQueueItem(ctx context.Context, id, cityID, player
 }
 
 func (s *viewerService) ListUnitQueueItems(ctx context.Context, cityID, playerID, lastID string, pageSize int) ([]*unitQueueItem, error) {
-	city, err := s.repository.GetCity(ctx, cityID, playerID)
-	if err != nil {
-		return nil, err
-	}
-
-	dbItems, err := s.repository.ListUnitQueueItems(ctx, city.id, lastID, pageSize)
+	dbItems, err := s.repository.ListUnitQueueItems(ctx, cityID, playerID, lastID, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -288,42 +118,8 @@ func (s *viewerService) ListUnitQueueItems(ctx context.Context, cityID, playerID
 	return items, nil
 }
 
-type buildingQueueItem struct {
-	id             string
-	cityID         string
-	queuedEpoch    int64
-	durationSec    int64
-	targetLevel    int64
-	targetBuilding string
-}
-
-func buildingQueueItemFromDBModel(item *dbBuildingQueueItem) *buildingQueueItem {
-	return &buildingQueueItem{
-		id:             item.id,
-		queuedEpoch:    item.queuedEpoch,
-		durationSec:    item.durationSec,
-		targetLevel:    item.targetLevel,
-		targetBuilding: item.targetBuilding,
-	}
-}
-
-func buildingQueueItemToDBModel(item *buildingQueueItem) *dbBuildingQueueItem {
-	return &dbBuildingQueueItem{
-		id:             item.id,
-		queuedEpoch:    item.queuedEpoch,
-		durationSec:    item.durationSec,
-		targetLevel:    item.targetLevel,
-		targetBuilding: item.targetBuilding,
-	}
-}
-
 func (s *viewerService) GetBuildingQueueItem(ctx context.Context, id, cityID, playerID string) (*buildingQueueItem, error) {
-	city, err := s.repository.GetCity(ctx, cityID, playerID)
-	if err != nil {
-		return nil, err
-	}
-
-	item, err := s.repository.GetBuildingQueueItem(ctx, id, city.id)
+	item, err := s.repository.GetBuildingQueueItem(ctx, id, cityID, playerID)
 	if err != nil {
 		return nil, err
 	}
@@ -332,12 +128,7 @@ func (s *viewerService) GetBuildingQueueItem(ctx context.Context, id, cityID, pl
 }
 
 func (s *viewerService) ListBuildingQueueItems(ctx context.Context, cityID, playerID, lastID string, pageSize int) ([]*buildingQueueItem, error) {
-	city, err := s.repository.GetCity(ctx, cityID, playerID)
-	if err != nil {
-		return nil, err
-	}
-
-	dbItems, err := s.repository.ListBuildingQueueItems(ctx, city.id, lastID, pageSize)
+	dbItems, err := s.repository.ListBuildingQueueItems(ctx, cityID, playerID, lastID, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +154,7 @@ type inserterService struct {
 }
 
 func (s *inserterService) StartMovement(ctx context.Context, playerID string, m *movement) error {
-	serverSideEpoch := time.Now().Unix()
+	serverSideEpoch := tSec(time.Now().Unix())
 
 	// important: these values cannot be trusted from the API
 	// set them on the server side based on token / internal clock
@@ -374,7 +165,7 @@ func (s *inserterService) StartMovement(ctx context.Context, playerID string, m 
 		DestinationID:  tCityID(m.destinationID),
 		DestinationX:   m.destinationX,
 		DestinationY:   m.destinationY,
-		DepartureEpoch: tEpoch(serverSideEpoch),
+		DepartureEpoch: serverSideEpoch,
 		UnitCount:      m.unitCount,
 		ResourceCount:  m.resourceCount,
 	}
@@ -400,10 +191,10 @@ func (s *inserterService) StartMovement(ctx context.Context, playerID string, m 
 }
 
 func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *unitQueueItem) error {
-	serverSideEpoch := time.Now().Unix()
+	serverSideEpoch := tSec(time.Now().Unix())
 
 	queueItem := queueUnitEvent{
-		UnitQueueItemID: tItemID(item.id),
+		UnitQueueItemID: tUnitQueueItemID(item.id),
 		CityID:          tCityID(item.cityID),
 		PlayerID:        tPlayerID(playerID),
 		UnitCount:       item.unitCount,
@@ -431,10 +222,10 @@ func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *
 }
 
 func (s *inserterService) QueueBuilding(ctx context.Context, playerID string, item *buildingQueueItem) error {
-	serverSideEpoch := time.Now().Unix()
+	serverSideEpoch := tSec(time.Now().Unix())
 
 	queueItem := queueBuildingEvent{
-		BuildingQueueItemID: tItemID(item.id),
+		BuildingQueueItemID: item.id,
 		CityID:              tCityID(item.cityID),
 		PlayerID:            tPlayerID(playerID),
 		TargetLevel:         item.targetLevel,
@@ -462,7 +253,7 @@ func (s *inserterService) QueueBuilding(ctx context.Context, playerID string, it
 }
 
 func (s *inserterService) CreateCity(ctx context.Context, playerID string, c *city) error {
-	serverSideEpoch := time.Now().Unix()
+	serverSideEpoch := tSec(time.Now().Unix())
 
 	createCity := createCityEvent{
 		CityID:    tCityID(c.id),
@@ -474,8 +265,8 @@ func (s *inserterService) CreateCity(ctx context.Context, playerID string, c *ci
 		// this comes with no resources and units - you build from zero. Only
 		// founded cities later in the game generate events with these two
 		// fields populated.
-		ResourceCount: make(tResourceCount),
-		UnitCount:     make(tUnitCount),
+		ResourceCount: make(tResourcesCount),
+		UnitCount:     make(tUnitsCount),
 	}
 	payload, err := json.Marshal(createCity)
 	if err != nil {
@@ -499,7 +290,7 @@ func (s *inserterService) CreateCity(ctx context.Context, playerID string, c *ci
 }
 
 func (s *inserterService) DeleteCity(ctx context.Context, playerID, cityID string) error {
-	serverSideEpoch := time.Now().Unix()
+	serverSideEpoch := tSec(time.Now().Unix())
 
 	deleteCity := deleteCityEvent{
 		PlayerID: tPlayerID(playerID),

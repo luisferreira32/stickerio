@@ -40,22 +40,7 @@ func (s *ServerHandler) GetCity(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 
-	resp := api.V1City{
-		CityInfo: api.V1CityInfo{
-			Id:        city.id,
-			Name:      city.name,
-			PlayerID:  city.playerID,
-			LocationX: city.locationX,
-			LocationY: city.locationY,
-		},
-		Buildings: city.buildingsLevel,
-		CityResources: api.V1CityResources{
-			Epoch:     city.resourceEpoch,
-			BaseCount: city.resourceBase,
-		},
-		UnitCount: city.unitCount,
-	}
-
+	resp := cityToAPIModel(city)
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(w, err.Error())
@@ -75,14 +60,7 @@ func (s *ServerHandler) GetCityInfo(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 
-	resp := api.V1CityInfo{
-		Id:        city.id,
-		Name:      city.name,
-		PlayerID:  city.playerID,
-		LocationX: city.locationX,
-		LocationY: city.locationY,
-	}
-
+	resp := cityToCityInfoAPIModel(city)
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(w, err.Error())
@@ -111,11 +89,7 @@ func (s *ServerHandler) ListCityInfo(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]api.V1CityInfo, len(cities))
 	for i := 0; i < len(cities); i++ {
-		resp[i].Id = cities[i].id
-		resp[i].Name = cities[i].name
-		resp[i].PlayerID = cities[i].playerID
-		resp[i].LocationX = cities[i].locationX
-		resp[i].LocationY = cities[i].locationY
+		resp[i] = cityToCityInfoAPIModel(cities[i])
 	}
 
 	respBytes, err := json.Marshal(resp)
@@ -138,19 +112,7 @@ func (s *ServerHandler) GetMovement(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err.Error())
 	}
 
-	resp := &api.V1Movement{
-		Id:             movement.id,
-		PlayerID:       movement.playerID,
-		OriginID:       movement.originID,
-		DestinationID:  movement.destinationID,
-		DestinationX:   movement.destinationX,
-		DestinationY:   movement.destinationY,
-		DepartureEpoch: movement.departureEpoch,
-		Speed:          movement.speed,
-		UnitCount:      movement.unitCount,
-		ResourceCount:  movement.resourceCount,
-	}
-
+	resp := movementToAPIModel(movement)
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(w, err.Error())
@@ -180,17 +142,7 @@ func (s *ServerHandler) ListMovements(w http.ResponseWriter, r *http.Request) {
 
 	movementsList := make([]api.V1Movement, len(movements))
 	for i := 0; i < len(movements); i++ {
-		movement := movements[i]
-		movementsList[i].Id = movement.id
-		movementsList[i].PlayerID = movement.playerID
-		movementsList[i].OriginID = movement.originID
-		movementsList[i].DestinationID = movement.destinationID
-		movementsList[i].DestinationX = movement.destinationX
-		movementsList[i].DestinationY = movement.destinationY
-		movementsList[i].DepartureEpoch = movement.departureEpoch
-		movementsList[i].Speed = movement.speed
-		movementsList[i].UnitCount = movement.unitCount
-		movementsList[i].ResourceCount = movement.unitCount
+		movementsList[i] = movementToAPIModel(movements[i])
 	}
 
 	resp, err := json.Marshal(movementsList)
@@ -215,14 +167,7 @@ func (s *ServerHandler) GetUnitQueueItem(w http.ResponseWriter, r *http.Request)
 		errHandle(w, err.Error())
 	}
 
-	resp := &api.V1UnitQueueItem{
-		Id:          item.id,
-		QueuedEpoch: item.queuedEpoch,
-		DurationSec: item.durationSec,
-		UnitCount:   item.unitCount,
-		UnitType:    item.unitType,
-	}
-
+	resp := unitQueueItemToAPIModel(item)
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(w, err.Error())
@@ -251,12 +196,7 @@ func (s *ServerHandler) ListUnitQueueItem(w http.ResponseWriter, r *http.Request
 
 	unitQueueItemsList := make([]api.V1UnitQueueItem, len(items))
 	for i := 0; i < len(items); i++ {
-		item := items[i]
-		unitQueueItemsList[i].Id = item.id
-		unitQueueItemsList[i].QueuedEpoch = item.queuedEpoch
-		unitQueueItemsList[i].DurationSec = item.durationSec
-		unitQueueItemsList[i].UnitCount = item.unitCount
-		unitQueueItemsList[i].UnitType = item.unitType
+		unitQueueItemsList[i] = unitQueueItemToAPIModel(items[i])
 	}
 
 	respBytes, err := json.Marshal(unitQueueItemsList)
@@ -281,14 +221,7 @@ func (s *ServerHandler) GetBuildingQueueItem(w http.ResponseWriter, r *http.Requ
 		errHandle(w, err.Error())
 	}
 
-	resp := &api.V1BuildingQueueItem{
-		Id:          item.id,
-		QueuedEpoch: item.queuedEpoch,
-		DurationSec: item.durationSec,
-		Level:       item.targetLevel,
-		Building:    item.targetBuilding,
-	}
-
+	resp := buildingQueueItemToAPIModel(item)
 	respBytes, err := resp.MarshalJSON()
 	if err != nil {
 		errHandle(w, err.Error())
@@ -317,12 +250,7 @@ func (s *ServerHandler) ListBuildingQueueItems(w http.ResponseWriter, r *http.Re
 
 	buildingQueueItemsList := make([]api.V1BuildingQueueItem, len(items))
 	for i := 0; i < len(items); i++ {
-		item := items[i]
-		buildingQueueItemsList[i].Id = item.id
-		buildingQueueItemsList[i].QueuedEpoch = item.queuedEpoch
-		buildingQueueItemsList[i].DurationSec = item.durationSec
-		buildingQueueItemsList[i].Level = item.targetLevel
-		buildingQueueItemsList[i].Building = item.targetBuilding
+		buildingQueueItemsList[i] = buildingQueueItemToAPIModel(items[i])
 	}
 
 	resp, err := json.Marshal(buildingQueueItemsList)
@@ -348,13 +276,13 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = s.inserter.StartMovement(r.Context(), playerID, &movement{
-		id:            m.Id,
-		originID:      m.OriginID,
-		destinationID: m.DestinationID,
-		destinationX:  m.DestinationX,
-		destinationY:  m.DestinationY,
-		resourceCount: m.ResourceCount,
-		unitCount:     m.UnitCount,
+		id:            tMovementID(m.Id),
+		originID:      tCityID(m.OriginID),
+		destinationID: tCityID(m.DestinationID),
+		destinationX:  tCoordinate(m.DestinationX),
+		destinationY:  tCoordinate(m.DestinationY),
+		resourceCount: fromUntypedMap[tResourceName, tResourceCount](m.ResourceCount),
+		unitCount:     fromUntypedMap[tUnitName, tUnitCount](m.UnitCount),
 	})
 	if err != nil {
 		errHandle(w, err.Error())
@@ -375,10 +303,10 @@ func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = s.inserter.QueueUnit(r.Context(), playerID, &unitQueueItem{
-		id:        item.Id,
-		cityID:    cityID,
-		unitCount: item.UnitCount,
-		unitType:  item.UnitType,
+		id:        tUnitQueueItemID(item.Id),
+		cityID:    tCityID(cityID),
+		unitCount: tUnitCount(item.UnitCount),
+		unitType:  tUnitName(item.UnitType),
 	})
 	if err != nil {
 		errHandle(w, err.Error())
@@ -398,10 +326,10 @@ func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = s.inserter.QueueBuilding(r.Context(), playerID, &buildingQueueItem{
-		id:             item.Id,
-		cityID:         cityID,
-		targetLevel:    item.Level,
-		targetBuilding: item.Building,
+		id:             tBuildingQueueItemID(item.Id),
+		cityID:         tCityID(cityID),
+		targetLevel:    tBuildingLevel(item.Level),
+		targetBuilding: tBuildingName(item.Building),
 	})
 	if err != nil {
 		errHandle(w, err.Error())
@@ -421,11 +349,11 @@ func (s *ServerHandler) CreateCity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = s.inserter.CreateCity(r.Context(), playerID, &city{
-		id:        m.Id,
+		id:        tCityID(m.Id),
 		name:      m.Name,
-		playerID:  playerID,
-		locationX: m.LocationX,
-		locationY: m.LocationY,
+		playerID:  tPlayerID(playerID),
+		locationX: tCoordinate(m.LocationX),
+		locationY: tCoordinate(m.LocationY),
 	})
 	if err != nil {
 		errHandle(w, err.Error())
