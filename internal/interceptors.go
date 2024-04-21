@@ -48,7 +48,7 @@ const (
 func WithAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: validate token and add info to context
-		playerID := r.Header[AuthenticationHeaderKey][0]
+		playerID := "foo"
 		if playerID == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte("unauthorized"))

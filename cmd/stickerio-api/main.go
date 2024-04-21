@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -16,15 +17,40 @@ import (
 	"github.com/luisferreira32/stickerio/internal"
 )
 
+type serverConfiguration struct {
+	databaseHost string
+	port         string
+	resyncPeriod time.Duration
+}
+
+func parseServerConfiguration() serverConfiguration {
+	resyncSec, err := strconv.Atoi(os.Getenv("RESYNC"))
+	if err != nil || resyncSec <= 0 {
+		resyncSec = 10
+	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	return serverConfiguration{
+		databaseHost: os.Getenv("DB_HOST"),
+		port:         port,
+		resyncPeriod: time.Duration(resyncSec) * time.Second,
+	}
+}
+
 func main() {
 	// The context should be the one controlling the lifecycle of the program
 	// ensure external SIGINT and SIGTERM are gracefully handled.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	database := internal.NewStickerioRepository(os.Getenv("DB_HOST"))
+	cfg := parseServerConfiguration()
+
+	database := internal.NewStickerioRepository(cfg.databaseHost)
 	eventSourcer := internal.NewEventSourcer(database)
-	eventSourcer.StartEventsWorker(ctx, 10*time.Second)
+	go eventSourcer.StartEventsWorker(ctx, cfg.resyncPeriod)
 	handlers := internal.NewServerHandler(database, eventSourcer)
 
 	router := chi.NewRouter()
@@ -76,13 +102,8 @@ func main() {
 		})
 	})
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	server := &http.Server{
-		Addr:              ":" + port,
+		Addr:              ":" + cfg.port,
 		ReadHeaderTimeout: 3 * time.Second,
 		Handler:           router,
 	}
@@ -95,6 +116,7 @@ func main() {
 			log.Printf("error starting server: %v", err)
 		}
 	}()
-	log.Printf("started stickerio-api server from %s on port %s", os.Args[0], port)
+	log.Printf("started stickerio-api server from %s on port %s", os.Args[0], cfg.port)
 	<-ctx.Done()
+	log.Printf("goodbye from the stickerio-api server!")
 }
