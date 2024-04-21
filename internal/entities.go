@@ -3,7 +3,7 @@ package internal
 import (
 	"encoding/json"
 
-	api "github.com/luisferreira32/stickerio/models"
+	api "github.com/luisferreira32/stickerio/api"
 )
 
 type (

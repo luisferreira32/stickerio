@@ -45,7 +45,7 @@ var (
 )
 
 func init() {
-	rawConfig, err := os.ReadFile("../config.json") // TODO: simplify the path for configuration reading
+	rawConfig, err := os.ReadFile("config.json") // TODO: simplify the path for configuration reading
 	if err != nil {
 		panic(err)
 	}

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	api "github.com/luisferreira32/stickerio/models"
+	api "github.com/luisferreira32/stickerio/api"
 )
 
 func errHandle(w http.ResponseWriter, fmtStr string, args ...any) {
