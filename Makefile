@@ -19,7 +19,7 @@ _clean_bin:
 	rm -rf bin/*
 
 .PHONY: compile
-compile: bin/stickerio-api
+compile: bin/stickerio-api bin/stickerio
 
 # }}}
 
