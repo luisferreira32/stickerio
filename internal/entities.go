@@ -7,8 +7,10 @@ import (
 )
 
 type (
-	tSec int64
+	tSec       int64
+	tEventName string
 
+	tEventID             string
 	tMovementID          string
 	tPlayerID            string
 	tCityID              string
@@ -40,28 +42,12 @@ func fromUntypedMap[K ~string, V ~int64](m map[string]int64) map[K]V {
 	return typedMap
 }
 
-func (t tResourcesCount) toUntypedMap() map[string]int64 {
-	ut := make(map[string]int64, len(t))
-	for k, v := range t {
-		ut[string(k)] = int64(v)
+func toUntypedMap[K ~string, V ~int64](m map[K]V) map[string]int64 {
+	untypedMap := make(map[string]int64, len(m))
+	for k, v := range m {
+		untypedMap[string(k)] = int64(v)
 	}
-	return ut
-}
-
-func (t tBuildingsLevel) toUntypedMap() map[string]int64 {
-	ut := make(map[string]int64, len(t))
-	for k, v := range t {
-		ut[string(k)] = int64(v)
-	}
-	return ut
-}
-
-func (t tUnitsCount) toUntypedMap() map[string]int64 {
-	ut := make(map[string]int64, len(t))
-	for k, v := range t {
-		ut[string(k)] = int64(v)
-	}
-	return ut
+	return untypedMap
 }
 
 type dbCity struct {
@@ -97,12 +83,12 @@ func cityToAPIModel(c *city) api.V1City {
 			LocationX: int32(c.locationX),
 			LocationY: int32(c.locationY),
 		},
-		Buildings: c.buildingsLevel.toUntypedMap(),
+		Buildings: toUntypedMap(c.buildingsLevel),
 		CityResources: api.V1CityResources{
 			Epoch:     int64(c.resourceEpoch),
-			BaseCount: c.resourceBase.toUntypedMap(),
+			BaseCount: toUntypedMap(c.resourceBase),
 		},
-		UnitCount: c.unitCount.toUntypedMap(),
+		UnitCount: toUntypedMap(c.unitCount),
 	}
 }
 
@@ -376,9 +362,21 @@ func buildingQueueItemToDBModel(item *buildingQueueItem) *dbBuildingQueueItem {
 	}
 }
 
+const (
+	startMovementEventName   tEventName = "startmovement"
+	arrivalMovementEventName tEventName = "arrival"
+	returnMovementEventName  tEventName = "returnmovement"
+	queueUnitEventName       tEventName = "queueunit"
+	createUnitEventName      tEventName = "createunit"
+	queueBuildingEventName   tEventName = "queuebuilding"
+	upgradeBuildingEventName tEventName = "upgradebuilding"
+	createCityEventName      tEventName = "createcity"
+	deleteCityEventName      tEventName = "deletecity"
+)
+
 type event struct {
-	id      string
-	name    string
+	id      tEventID
+	name    tEventName
 	epoch   tSec
 	payload string // TODO: json encode might not be the most efficient way - improve this
 }

@@ -91,31 +91,24 @@ FROM cities_view
 WHERE id=$1 AND player_id=$2
 `
 
-	rows, err := r.db.QueryContext(ctx, getCityQuery, id, playerID)
-	if err != nil {
-		return nil, fmt.Errorf("getCityQuery failed: %w", err)
-	}
-
+	row := r.db.QueryRowContext(ctx, getCityQuery, id, playerID)
 	result := &dbCity{}
-
-	for rows.Next() {
-		err := rows.Scan(
-			&result.id,
-			&result.name,
-			&result.playerID,
-			&result.locationX,
-			&result.locationY,
-			&result.buildingsLevel,
-			&result.resourceBase,
-			&result.resourceEpoch,
-			&result.unitCount,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("rows scan: %w", err)
-		}
+	err := row.Scan(
+		&result.id,
+		&result.name,
+		&result.playerID,
+		&result.locationX,
+		&result.locationY,
+		&result.buildingsLevel,
+		&result.resourceBase,
+		&result.resourceEpoch,
+		&result.unitCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getCityQuery scan: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err := row.Err(); err != nil {
 		return nil, fmt.Errorf("rows err: %w", err)
 	}
 
@@ -134,27 +127,20 @@ FROM cities_view
 WHERE id=$1
 `
 
-	rows, err := r.db.QueryContext(ctx, getCityInfoQuery, id)
-	if err != nil {
-		return nil, fmt.Errorf("getCityInfoQuery failed: %w", err)
-	}
-
+	row := r.db.QueryRowContext(ctx, getCityInfoQuery, id)
 	result := &dbCity{}
-
-	for rows.Next() {
-		err := rows.Scan(
-			&result.id,
-			&result.name,
-			&result.playerID,
-			&result.locationX,
-			&result.locationY,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("rows scan: %w", err)
-		}
+	err := row.Scan(
+		&result.id,
+		&result.name,
+		&result.playerID,
+		&result.locationX,
+		&result.locationY,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getCityInfoQuery scan: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err := row.Err(); err != nil {
 		return nil, fmt.Errorf("rows err: %w", err)
 	}
 
@@ -309,32 +295,25 @@ FROM movements_view
 WHERE id=$1 AND player_id=$2
 `
 
-	rows, err := r.db.QueryContext(ctx, getMovementQuery, id, playerID)
-	if err != nil {
-		return nil, fmt.Errorf("getMovementQuery failed: %w", err)
-	}
-
+	row := r.db.QueryRowContext(ctx, getMovementQuery, id, playerID)
 	result := &dbMovement{}
-
-	for rows.Next() {
-		err := rows.Scan(
-			&result.id,
-			&result.playerID,
-			&result.originID,
-			&result.destinationID,
-			&result.destinationX,
-			&result.destinationY,
-			&result.departureEpoch,
-			&result.speed,
-			&result.resourceCount,
-			&result.unitCount,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("rows scan: %w", err)
-		}
+	err := row.Scan(
+		&result.id,
+		&result.playerID,
+		&result.originID,
+		&result.destinationID,
+		&result.destinationX,
+		&result.destinationY,
+		&result.departureEpoch,
+		&result.speed,
+		&result.resourceCount,
+		&result.unitCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getMovementQuery scan: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err := row.Err(); err != nil {
 		return nil, fmt.Errorf("rows err: %w", err)
 	}
 
@@ -488,29 +467,22 @@ FROM unit_queue_view
 WHERE id=$1 AND city_id=$2 AND player_id=$3
 `
 
-	rows, err := r.db.QueryContext(ctx, getUnitQueueItemQuery, id, cityID, playerID)
-	if err != nil {
-		return nil, fmt.Errorf("getUnitQueueItemQuery failed: %w", err)
-	}
-
+	row := r.db.QueryRowContext(ctx, getUnitQueueItemQuery, id, cityID, playerID)
 	result := &dbUnitQueueItem{}
-
-	for rows.Next() {
-		err := rows.Scan(
-			&result.id,
-			&result.cityID,
-			&result.playerID,
-			&result.queuedEpoch,
-			&result.durationSec,
-			&result.unitCount,
-			&result.unitType,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("rows scan: %w", err)
-		}
+	err := row.Scan(
+		&result.id,
+		&result.cityID,
+		&result.playerID,
+		&result.queuedEpoch,
+		&result.durationSec,
+		&result.unitCount,
+		&result.unitType,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getUnitQueueItemQuery scan: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err := row.Err(); err != nil {
 		return nil, fmt.Errorf("rows err: %w", err)
 	}
 
@@ -647,29 +619,22 @@ FROM building_queue_view
 WHERE id=$1 AND city_id=$2 AND player_id=$3 
 `
 
-	rows, err := r.db.QueryContext(ctx, getUnitQueueItemQuery, id, cityID, playerID)
+	row := r.db.QueryRowContext(ctx, getUnitQueueItemQuery, id, cityID, playerID)
+	result := &dbBuildingQueueItem{}
+	err := row.Scan(
+		&result.id,
+		&result.cityID,
+		&result.playerID,
+		&result.queuedEpoch,
+		&result.durationSec,
+		&result.targetLevel,
+		&result.targetBuilding,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("getUnitQueueItemQuery failed: %w", err)
 	}
 
-	result := &dbBuildingQueueItem{}
-
-	for rows.Next() {
-		err := rows.Scan(
-			&result.id,
-			&result.cityID,
-			&result.playerID,
-			&result.queuedEpoch,
-			&result.durationSec,
-			&result.targetLevel,
-			&result.targetBuilding,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("rows scan: %w", err)
-		}
-	}
-
-	if err := rows.Err(); err != nil {
+	if err := row.Err(); err != nil {
 		return nil, fmt.Errorf("rows err: %w", err)
 	}
 

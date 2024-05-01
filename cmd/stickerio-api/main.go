@@ -72,7 +72,7 @@ func main() {
 			router.Post("/", handlers.CreateCity)
 			router.With(internal.WithCityIDContext).Route(fmt.Sprintf("/{%s}", internal.CityID), func(router chi.Router) {
 				router.Get("/", handlers.GetCity)
-				router.Get("/", handlers.DeleteCity)
+				router.Delete("/", handlers.DeleteCity)
 				router.Get("/info", handlers.GetCityInfo)
 				router.Route("/unitqitems", func(router chi.Router) {
 					router.Get("/", handlers.ListUnitQueueItem)
@@ -93,7 +93,7 @@ func main() {
 		router.Route("/movements", func(router chi.Router) {
 			router.Use(internal.WithPagination)
 			router.Get("/", handlers.ListMovements)
-			router.Post("/start", handlers.StartMovement)
+			router.Post("/", handlers.StartMovement)
 
 			router.Route(fmt.Sprintf("/{%s}", internal.MovementID), func(router chi.Router) {
 				router.Use(internal.WithMovementIDContext)

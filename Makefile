@@ -19,7 +19,7 @@ _clean_bin:
 	rm -rf bin/*
 
 .PHONY: compile
-compile: bin/stickerio-api
+compile: bin/stickerio-api bin/stickerio
 
 # }}}
 
@@ -46,6 +46,7 @@ dummy_server: tmp/mockdb.sqlite3 bin/stickerio-api
 test: tmp/mockdb.sqlite3 bin/stickerio-api
 	DB_HOST=tmp/mockdb.sqlite3 bin/stickerio-api &
 	go test -v  ./test/
+	pkill stickerio-api
 
 .PHONY: clean
 clean: _clean_bin _clean_mock_db

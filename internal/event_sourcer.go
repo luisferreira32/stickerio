@@ -14,18 +14,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	startMovementEventName   = "startmovement"
-	arrivalMovementEventName = "arrival"
-	returnMovementEventName  = "returnmovement"
-	queueUnitEventName       = "queueunit"
-	createUnitEventName      = "createunit"
-	queueBuildingEventName   = "queuebuilding"
-	upgradeBuildingEventName = "upgradebuilding"
-	createCityEventName      = "createcity"
-	deleteCityEventName      = "deletecity"
-)
-
 var (
 	// thrown when the event is correctly built but it is invalid to process it
 	// e.g., try to move more troops than you own
@@ -376,7 +364,7 @@ func (s *EventSourcer) processStartMovementEvent(ctx context.Context, e *event) 
 		return err
 	}
 	chainEvent := &event{
-		id:      uuid.NewString(),
+		id:      tEventID(uuid.NewString()),
 		name:    arrivalMovementEventName,
 		epoch:   startMovement.DepartureEpoch + travelDurationSec,
 		payload: string(payload),
@@ -481,7 +469,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 			return err
 		}
 		chainEvent := &event{
-			id:      uuid.NewString(),
+			id:      tEventID(uuid.NewString()),
 			name:    returnMovementEventName,
 			epoch:   e.epoch + travelDurationSec,
 			payload: string(payload),
@@ -652,7 +640,7 @@ func (s *EventSourcer) processArrivalMovementEvent(ctx context.Context, e *event
 			return err
 		}
 		chainEvent := &event{
-			id:      uuid.NewString(),
+			id:      tEventID(uuid.NewString()),
 			name:    returnMovementEventName,
 			epoch:   e.epoch + travelDurationSec,
 			payload: string(payload),
@@ -722,7 +710,7 @@ func (s *EventSourcer) processReturnMovementEvent(ctx context.Context, e *event)
 			return err
 		}
 		chainEvent := &event{
-			id:      uuid.NewString(),
+			id:      tEventID(uuid.NewString()),
 			name:    arrivalMovementEventName,
 			epoch:   e.epoch + travelDurationSec,
 			payload: string(payload),
@@ -777,7 +765,7 @@ func (s *EventSourcer) processQueueUnitEventName(ctx context.Context, e *event) 
 		return err
 	}
 	chainEvent := &event{
-		id:      uuid.NewString(),
+		id:      tEventID(uuid.NewString()),
 		name:    createUnitEventName,
 		epoch:   e.epoch + trainingDurationSec,
 		payload: string(payload),
@@ -867,7 +855,7 @@ func (s *EventSourcer) processQueueBuildingEvent(ctx context.Context, e *event) 
 		return err
 	}
 	chainEvent := &event{
-		id:      uuid.NewString(),
+		id:      tEventID(uuid.NewString()),
 		name:    upgradeBuildingEventName,
 		epoch:   e.epoch + upgradeDurationSec,
 		payload: string(payload),
