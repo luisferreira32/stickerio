@@ -50,6 +50,10 @@ paths:
       responses:
         '202':
           description: Accepted
+          content:
+            application/json:
+              schema:
+                type: string
   /v1/cities/{cityid}:
     get:
       summary: Get a city complete state.
@@ -136,6 +140,10 @@ paths:
       responses:
         '202':
           description: Accepted
+          content:
+            application/json:
+              schema:
+                type: string
   /v1/cities/{cityid}/unitqitems/{itemid}:
     get:
       summary: Get a unit queue item.
@@ -200,6 +208,10 @@ paths:
       responses:
         '202':
           description: Accepted
+          content:
+            application/json:
+              schema:
+                type: string
   /v1/cities/{cityid}/buildingqitems/{itemid}:
     get:
       summary: Get a building queue item.
@@ -261,6 +273,10 @@ paths:
       responses:
         '202':
           description: Accepted
+          content:
+            application/json:
+              schema:
+                type: string
   /v1/movements/{movementid}:
     get:
       summary: Get a movement for the player.

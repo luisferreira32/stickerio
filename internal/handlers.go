@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	api "github.com/luisferreira32/stickerio/api"
 )
 
@@ -315,8 +317,9 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	movementID := uuid.NewString()
 	err = s.inserter.StartMovement(r.Context(), playerID, &movement{
-		id:            tMovementID(m.Id),
+		id:            tMovementID(movementID),
 		originID:      tCityID(m.OriginID),
 		destinationID: tCityID(m.DestinationID),
 		destinationX:  tCoordinate(m.DestinationX),
@@ -329,6 +332,7 @@ func (s *ServerHandler) StartMovement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Write([]byte(movementID))
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -344,8 +348,9 @@ func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	unitQueueItemID := uuid.NewString()
 	err = s.inserter.QueueUnit(r.Context(), playerID, &unitQueueItem{
-		id:        tUnitQueueItemID(item.Id),
+		id:        tUnitQueueItemID(unitQueueItemID),
 		cityID:    tCityID(cityID),
 		unitCount: tUnitCount(item.UnitCount),
 		unitType:  tUnitName(item.UnitType),
@@ -354,6 +359,8 @@ func (s *ServerHandler) QueueUnit(w http.ResponseWriter, r *http.Request) {
 		errHandle(w, err)
 		return
 	}
+
+	w.Write([]byte(unitQueueItemID))
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -369,8 +376,9 @@ func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	buildingQueueItemID := uuid.NewString()
 	err = s.inserter.QueueBuilding(r.Context(), playerID, &buildingQueueItem{
-		id:             tBuildingQueueItemID(item.Id),
+		id:             tBuildingQueueItemID(buildingQueueItemID),
 		cityID:         tCityID(cityID),
 		targetLevel:    tBuildingLevel(item.Level),
 		targetBuilding: tBuildingName(item.Building),
@@ -380,6 +388,7 @@ func (s *ServerHandler) QueueBuilding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Write([]byte(buildingQueueItemID))
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -394,8 +403,9 @@ func (s *ServerHandler) CreateCity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cityID := uuid.NewString()
 	err = s.inserter.CreateCity(r.Context(), playerID, &city{
-		id:        tCityID(m.Id),
+		id:        tCityID(cityID),
 		name:      m.Name,
 		playerID:  tPlayerID(playerID),
 		locationX: tCoordinate(m.LocationX),
@@ -406,6 +416,7 @@ func (s *ServerHandler) CreateCity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Write([]byte(cityID))
 	w.WriteHeader(http.StatusAccepted)
 }
 

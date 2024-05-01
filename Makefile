@@ -44,8 +44,8 @@ dummy_server: tmp/mockdb.sqlite3 bin/stickerio-api
 
 .PHONY: test
 test: tmp/mockdb.sqlite3 bin/stickerio-api
-	DB_HOST=tmp/mockdb.sqlite3 bin/stickerio-api &
-	go test -v  ./test/
+	PORT=8080 DB_HOST=tmp/mockdb.sqlite3 bin/stickerio-api &
+	STICKEIO_API=http://localhost:8080 go test -v  ./test/
 	pkill stickerio-api
 
 .PHONY: clean

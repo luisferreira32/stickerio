@@ -1,11 +1,34 @@
 package test
 
 import (
+	"bytes"
 	"net/http"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	api "github.com/luisferreira32/stickerio/api"
 )
+
+// TODO: more fixtures and options
+
+func fixtureStartMovement() *http.Request {
+	m := api.V1Movement{}
+	b, err := m.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+
+	r, err := http.NewRequest(
+		"POST",
+		"http://localhost:8080/v1/movements",
+		bytes.NewReader(b),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
 
 func Test_regressions(t *testing.T) {
 	testcases := []struct {

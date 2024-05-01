@@ -260,7 +260,7 @@ func (r ApiV1CitiesCityidBuildingqitemsPostRequest) V1BuildingQueueItem(v1Buildi
 	return r
 }
 
-func (r ApiV1CitiesCityidBuildingqitemsPostRequest) Execute() (*http.Response, error) {
+func (r ApiV1CitiesCityidBuildingqitemsPostRequest) Execute() (string, *http.Response, error) {
 	return r.ApiService.V1CitiesCityidBuildingqitemsPostExecute(r)
 }
 
@@ -280,16 +280,18 @@ func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPost(ctx context.Context
 }
 
 // Execute executes the request
-func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPostExecute(r ApiV1CitiesCityidBuildingqitemsPostRequest) (*http.Response, error) {
+//  @return string
+func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPostExecute(r ApiV1CitiesCityidBuildingqitemsPostRequest) (string, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
+		localVarReturnValue  string
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1CitiesCityidBuildingqitemsPost")
 	if err != nil {
-		return nil, &GenericOpenAPIError{error: err.Error()}
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
 	localVarPath := localBasePath + "/v1/cities/{cityid}/buildingqitems"
@@ -299,7 +301,7 @@ func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPostExecute(r ApiV1Citie
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 	if r.v1BuildingQueueItem == nil {
-		return nil, reportError("v1BuildingQueueItem is required and must be specified")
+		return localVarReturnValue, nil, reportError("v1BuildingQueueItem is required and must be specified")
 	}
 
 	// to determine the Content-Type header
@@ -312,7 +314,7 @@ func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPostExecute(r ApiV1Citie
 	}
 
 	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{}
+	localVarHTTPHeaderAccepts := []string{"application/json"}
 
 	// set Accept header
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
@@ -323,19 +325,19 @@ func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPostExecute(r ApiV1Citie
 	localVarPostBody = r.v1BuildingQueueItem
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
-		return nil, err
+		return localVarReturnValue, nil, err
 	}
 
 	localVarHTTPResponse, err := a.client.callAPI(req)
 	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
 	localVarHTTPResponse.Body.Close()
 	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
 	if err != nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	if localVarHTTPResponse.StatusCode >= 300 {
@@ -343,10 +345,19 @@ func (a *DefaultAPIService) V1CitiesCityidBuildingqitemsPostExecute(r ApiV1Citie
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
 type ApiV1CitiesCityidDeleteRequest struct {
@@ -877,7 +888,7 @@ func (r ApiV1CitiesCityidUnitqitemsPostRequest) V1UnitQueueItem(v1UnitQueueItem 
 	return r
 }
 
-func (r ApiV1CitiesCityidUnitqitemsPostRequest) Execute() (*http.Response, error) {
+func (r ApiV1CitiesCityidUnitqitemsPostRequest) Execute() (string, *http.Response, error) {
 	return r.ApiService.V1CitiesCityidUnitqitemsPostExecute(r)
 }
 
@@ -897,16 +908,18 @@ func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPost(ctx context.Context, ci
 }
 
 // Execute executes the request
-func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCityidUnitqitemsPostRequest) (*http.Response, error) {
+//  @return string
+func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCityidUnitqitemsPostRequest) (string, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
+		localVarReturnValue  string
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1CitiesCityidUnitqitemsPost")
 	if err != nil {
-		return nil, &GenericOpenAPIError{error: err.Error()}
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
 	localVarPath := localBasePath + "/v1/cities/{cityid}/unitqitems"
@@ -916,7 +929,7 @@ func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCit
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 	if r.v1UnitQueueItem == nil {
-		return nil, reportError("v1UnitQueueItem is required and must be specified")
+		return localVarReturnValue, nil, reportError("v1UnitQueueItem is required and must be specified")
 	}
 
 	// to determine the Content-Type header
@@ -929,7 +942,7 @@ func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCit
 	}
 
 	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{}
+	localVarHTTPHeaderAccepts := []string{"application/json"}
 
 	// set Accept header
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
@@ -940,19 +953,19 @@ func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCit
 	localVarPostBody = r.v1UnitQueueItem
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
-		return nil, err
+		return localVarReturnValue, nil, err
 	}
 
 	localVarHTTPResponse, err := a.client.callAPI(req)
 	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
 	localVarHTTPResponse.Body.Close()
 	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
 	if err != nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	if localVarHTTPResponse.StatusCode >= 300 {
@@ -960,10 +973,19 @@ func (a *DefaultAPIService) V1CitiesCityidUnitqitemsPostExecute(r ApiV1CitiesCit
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
 type ApiV1CitiesGetRequest struct {
@@ -1118,7 +1140,7 @@ func (r ApiV1CitiesPostRequest) V1CityInfo(v1CityInfo V1CityInfo) ApiV1CitiesPos
 	return r
 }
 
-func (r ApiV1CitiesPostRequest) Execute() (*http.Response, error) {
+func (r ApiV1CitiesPostRequest) Execute() (string, *http.Response, error) {
 	return r.ApiService.V1CitiesPostExecute(r)
 }
 
@@ -1136,16 +1158,18 @@ func (a *DefaultAPIService) V1CitiesPost(ctx context.Context) ApiV1CitiesPostReq
 }
 
 // Execute executes the request
-func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (*http.Response, error) {
+//  @return string
+func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (string, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
+		localVarReturnValue  string
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1CitiesPost")
 	if err != nil {
-		return nil, &GenericOpenAPIError{error: err.Error()}
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
 	localVarPath := localBasePath + "/v1/cities"
@@ -1154,7 +1178,7 @@ func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (*http
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 	if r.v1CityInfo == nil {
-		return nil, reportError("v1CityInfo is required and must be specified")
+		return localVarReturnValue, nil, reportError("v1CityInfo is required and must be specified")
 	}
 
 	// to determine the Content-Type header
@@ -1167,7 +1191,7 @@ func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (*http
 	}
 
 	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{}
+	localVarHTTPHeaderAccepts := []string{"application/json"}
 
 	// set Accept header
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
@@ -1178,19 +1202,19 @@ func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (*http
 	localVarPostBody = r.v1CityInfo
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
-		return nil, err
+		return localVarReturnValue, nil, err
 	}
 
 	localVarHTTPResponse, err := a.client.callAPI(req)
 	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
 	localVarHTTPResponse.Body.Close()
 	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
 	if err != nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	if localVarHTTPResponse.StatusCode >= 300 {
@@ -1198,10 +1222,19 @@ func (a *DefaultAPIService) V1CitiesPostExecute(r ApiV1CitiesPostRequest) (*http
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
 type ApiV1MovementsGetRequest struct {
@@ -1449,7 +1482,7 @@ func (r ApiV1MovementsPostRequest) V1Movement(v1Movement V1Movement) ApiV1Moveme
 	return r
 }
 
-func (r ApiV1MovementsPostRequest) Execute() (*http.Response, error) {
+func (r ApiV1MovementsPostRequest) Execute() (string, *http.Response, error) {
 	return r.ApiService.V1MovementsPostExecute(r)
 }
 
@@ -1467,16 +1500,18 @@ func (a *DefaultAPIService) V1MovementsPost(ctx context.Context) ApiV1MovementsP
 }
 
 // Execute executes the request
-func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) (*http.Response, error) {
+//  @return string
+func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) (string, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
+		localVarReturnValue  string
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1MovementsPost")
 	if err != nil {
-		return nil, &GenericOpenAPIError{error: err.Error()}
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
 	localVarPath := localBasePath + "/v1/movements"
@@ -1485,7 +1520,7 @@ func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) 
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 	if r.v1Movement == nil {
-		return nil, reportError("v1Movement is required and must be specified")
+		return localVarReturnValue, nil, reportError("v1Movement is required and must be specified")
 	}
 
 	// to determine the Content-Type header
@@ -1498,7 +1533,7 @@ func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) 
 	}
 
 	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{}
+	localVarHTTPHeaderAccepts := []string{"application/json"}
 
 	// set Accept header
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
@@ -1509,19 +1544,19 @@ func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) 
 	localVarPostBody = r.v1Movement
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
-		return nil, err
+		return localVarReturnValue, nil, err
 	}
 
 	localVarHTTPResponse, err := a.client.callAPI(req)
 	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
 	localVarHTTPResponse.Body.Close()
 	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
 	if err != nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	if localVarHTTPResponse.StatusCode >= 300 {
@@ -1529,8 +1564,17 @@ func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) 
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
 }
