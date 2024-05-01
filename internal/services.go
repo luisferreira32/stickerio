@@ -175,7 +175,7 @@ func (s *inserterService) StartMovement(ctx context.Context, playerID string, m 
 		return err
 	}
 
-	eventID := uuid.NewString()
+	eventID := tEventID(uuid.NewString())
 	e := &event{
 		id:      eventID,
 		name:    startMovementEventName,
@@ -205,7 +205,7 @@ func (s *inserterService) QueueUnit(ctx context.Context, playerID string, item *
 		return err
 	}
 
-	eventID := uuid.NewString()
+	eventID := tEventID(uuid.NewString())
 	e := &event{
 		id:      eventID,
 		name:    queueUnitEventName,
@@ -236,7 +236,7 @@ func (s *inserterService) QueueBuilding(ctx context.Context, playerID string, it
 		return err
 	}
 
-	eventID := uuid.NewString()
+	eventID := tEventID(uuid.NewString())
 	e := &event{
 		id:      eventID,
 		name:    queueBuildingEventName,
@@ -273,7 +273,7 @@ func (s *inserterService) CreateCity(ctx context.Context, playerID string, c *ci
 		return err
 	}
 
-	eventID := uuid.NewString()
+	eventID := tEventID(uuid.NewString())
 	e := &event{
 		id:      eventID,
 		name:    createCityEventName,
@@ -301,7 +301,7 @@ func (s *inserterService) DeleteCity(ctx context.Context, playerID, cityID strin
 		return err
 	}
 
-	eventID := uuid.NewString()
+	eventID := tEventID(uuid.NewString())
 	e := &event{
 		id:      eventID,
 		name:    createCityEventName,

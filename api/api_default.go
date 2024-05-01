@@ -1438,48 +1438,48 @@ func (a *DefaultAPIService) V1MovementsMovementidGetExecute(r ApiV1MovementsMove
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiV1MovementsStartPostRequest struct {
+type ApiV1MovementsPostRequest struct {
 	ctx context.Context
 	ApiService *DefaultAPIService
 	v1Movement *V1Movement
 }
 
-func (r ApiV1MovementsStartPostRequest) V1Movement(v1Movement V1Movement) ApiV1MovementsStartPostRequest {
+func (r ApiV1MovementsPostRequest) V1Movement(v1Movement V1Movement) ApiV1MovementsPostRequest {
 	r.v1Movement = &v1Movement
 	return r
 }
 
-func (r ApiV1MovementsStartPostRequest) Execute() (*http.Response, error) {
-	return r.ApiService.V1MovementsStartPostExecute(r)
+func (r ApiV1MovementsPostRequest) Execute() (*http.Response, error) {
+	return r.ApiService.V1MovementsPostExecute(r)
 }
 
 /*
-V1MovementsStartPost Start a movement.
+V1MovementsPost Start a movement.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiV1MovementsStartPostRequest
+ @return ApiV1MovementsPostRequest
 */
-func (a *DefaultAPIService) V1MovementsStartPost(ctx context.Context) ApiV1MovementsStartPostRequest {
-	return ApiV1MovementsStartPostRequest{
+func (a *DefaultAPIService) V1MovementsPost(ctx context.Context) ApiV1MovementsPostRequest {
+	return ApiV1MovementsPostRequest{
 		ApiService: a,
 		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-func (a *DefaultAPIService) V1MovementsStartPostExecute(r ApiV1MovementsStartPostRequest) (*http.Response, error) {
+func (a *DefaultAPIService) V1MovementsPostExecute(r ApiV1MovementsPostRequest) (*http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1MovementsStartPost")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "DefaultAPIService.V1MovementsPost")
 	if err != nil {
 		return nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/movements/start"
+	localVarPath := localBasePath + "/v1/movements"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

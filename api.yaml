@@ -250,6 +250,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/v1Movement'
+    post:
+      summary: Start a movement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/v1Movement'
+      responses:
+        '202':
+          description: Accepted
   /v1/movements/{movementid}:
     get:
       summary: Get a movement for the player.
@@ -266,18 +277,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1Movement'
-  /v1/movements/start:
-    post:
-      summary: Start a movement.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/v1Movement'
-      responses:
-        '202':
-          description: Accepted
+
 
 components:
   schemas:
